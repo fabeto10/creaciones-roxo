@@ -11,7 +11,22 @@ export const getProducts = async (req, res) => {
     const products = await prisma.product.findMany({
       where: { isActive: true }
     });
-    res.json(products);
+
+    // Procesar imágenes para asegurar URLs completas
+    const productsWithProcessedImages = products.map(product => ({
+      ...product,
+      images: product.images.map(image => {
+        if (image.startsWith('http')) {
+          return image;
+        }
+        if (image.startsWith('/')) {
+          return `http://localhost:5000${image}`;
+        }
+        return `http://localhost:5000/uploads/${image}`;
+      })
+    }));
+
+    res.json(productsWithProcessedImages);
   } catch (error) {
     res.status(500).json({ message: 'Error obteniendo productos', error: error.message });
   }
@@ -29,11 +44,26 @@ export const getProductById = async (req, res) => {
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
-    res.json(product);
+    // Procesar imágenes para asegurar URLs completas
+    const productWithProcessedImages = {
+      ...product,
+      images: product.images.map(image => {
+        if (image.startsWith('http')) {
+          return image;
+        }
+        if (image.startsWith('/')) {
+          return `http://localhost:5000${image}`;
+        }
+        return `http://localhost:5000/uploads/${image}`;
+      })
+    };
+
+    res.json(productWithProcessedImages);
   } catch (error) {
     res.status(500).json({ message: 'Error obteniendo producto', error: error.message });
   }
 };
+
 
 // POST crear producto
 export const createProduct = async (req, res) => {

@@ -11,13 +11,10 @@ import {
   Select,
   MenuItem,
   TextField,
-  Card,
-  CardContent,
   Alert,
   Stepper,
   Step,
   StepLabel,
-  StepContent,
   Divider,
   List,
   ListItem,
@@ -38,6 +35,7 @@ import {
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import ImageWithFallback from "../../components/common/ImageWithFallback";
 
 const CheckoutPage = () => {
   const {
@@ -47,7 +45,9 @@ const CheckoutPage = () => {
     updateQuantity,
     clearCart,
     calculateCartPriceInfo,
+    calculateDiscountPercentage,
   } = useCart();
+
   const cartPriceInfo = calculateCartPriceInfo();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -136,13 +136,11 @@ const CheckoutPage = () => {
   const handleScreenshotChange = (event) => {
     const file = event.target.files[0];
     if (file) {
-      // Validar que sea una imagen
       if (!file.type.startsWith("image/")) {
         setError("Por favor selecciona un archivo de imagen");
         return;
       }
 
-      // Validar tamaño (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setError("La imagen debe ser menor a 5MB");
         return;
@@ -162,7 +160,7 @@ const CheckoutPage = () => {
     setError("");
 
     try {
-      // Validaciones
+      // Validaciones básicas
       if (!paymentDetails.senderName) {
         throw new Error("El nombre del remitente es requerido");
       }
@@ -173,7 +171,23 @@ const CheckoutPage = () => {
 
       // Crear FormData para la transacción
       const formData = new FormData();
-      formData.append("items", JSON.stringify(cartItems));
+      formData.append(
+        "items",
+        JSON.stringify(
+          cartItems.map((item) => ({
+            id: item.id,
+            product: {
+              id: item.product.id,
+              name: item.product.name,
+              basePrice: item.product.basePrice,
+            },
+            price: item.price,
+            quantity: item.quantity,
+            customization: item.customization,
+          }))
+        )
+      );
+
       formData.append("paymentMethod", paymentMethod);
       formData.append("paymentDetails", JSON.stringify(paymentDetails));
 
@@ -189,7 +203,6 @@ const CheckoutPage = () => {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          // NO incluir 'Content-Type' cuando usas FormData - el navegador lo establece automáticamente
         },
         body: formData,
       });
@@ -257,6 +270,18 @@ const CheckoutPage = () => {
 
   const paymentInfo = getPaymentMethodInfo(paymentMethod);
 
+  // Calcular precio final según método de pago
+  const getFinalPrice = () => {
+    const totalUSD = getCartTotalUSD();
+
+    if (["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(paymentMethod)) {
+      const discountPercentage = calculateDiscountPercentage();
+      return totalUSD * (1 - discountPercentage / 100);
+    }
+
+    return totalUSD;
+  };
+
   if (!isAuthenticated || cartItems.length === 0) {
     return null;
   }
@@ -268,10 +293,10 @@ const CheckoutPage = () => {
         gutterBottom
         className="roxo-text-gradient"
         fontWeight="bold"
+        component="div"
       >
         Finalizar Compra
       </Typography>
-
       <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
         {steps.map((label) => (
           <Step key={label}>
@@ -279,13 +304,11 @@ const CheckoutPage = () => {
           </Step>
         ))}
       </Stepper>
-
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
-
       {/* Paso 1: Revisar Carrito */}
       {activeStep === 0 && (
         <Grid container spacing={4}>
@@ -300,27 +323,39 @@ const CheckoutPage = () => {
                 {cartItems.map((item) => (
                   <ListItem key={item.id} divider>
                     <ListItemIcon>
-                      <img
-                        src={item.image}
-                        alt={item.product.name}
-                        style={{
-                          width: 60,
-                          height: 60,
-                          objectFit: "cover",
-                          borderRadius: 8,
-                        }}
-                      />
+                      <Box sx={{ width: 60, height: 60, position: "relative" }}>
+                        <ImageWithFallback
+                          src={item.image}
+                          alt={item.product.name}
+                          fallbackSrc="/images/placeholder-bracelet.jpg"
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            borderRadius: 8,
+                          }}
+                        />
+                      </Box>
                     </ListItemIcon>
                     <ListItemText
                       primary={item.product.name}
                       secondary={
-                        <Box>
-                          <Typography variant="body2">
+                        <Box component="div">
+                          <Typography
+                            variant="body2"
+                            component="span"
+                            display="block"
+                          >
                             Precio: ${item.price} x {item.quantity} = $
                             {(item.price * item.quantity).toFixed(2)}
                           </Typography>
                           {item.customization && (
-                            <Typography variant="body2" color="textSecondary">
+                            <Typography
+                              variant="body2"
+                              component="span"
+                              display="block"
+                              color="textSecondary"
+                            >
                               Personalización: {item.customization.material},{" "}
                               {item.customization.color}
                             </Typography>
@@ -364,122 +399,42 @@ const CheckoutPage = () => {
           </Grid>
 
           <Grid item xs={12} md={4}>
-                       {" "}
             <Paper elevation={2} sx={{ p: 3 }}>
-                           {" "}
               <Typography variant="h6" gutterBottom>
-                                Resumen del Pedido              {" "}
+                Resumen del Pedido
               </Typography>
-                            <Divider sx={{ my: 2 }} />             {" "}
+              <Divider sx={{ my: 2 }} />
+
               <Box sx={{ mb: 2 }}>
-                               {" "}
-                <Box display="flex" justifyContent="space-between" mb={1}>
-                                   {" "}
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ textDecoration: "line-through" }}
-                  >
-                                        Total regular:                  {" "}
-                  </Typography>
-                                   {" "}
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ textDecoration: "line-through" }}
-                  >
-                                        $
-                    {cartPriceInfo.savings.priceBSParallel.toFixed(2)} BS      
-                               {" "}
-                  </Typography>
-                                 {" "}
-                </Box>
-                               {" "}
                 <Box
                   display="flex"
                   justifyContent="space-between"
                   alignItems="center"
                   mb={1}
                 >
-                                   {" "}
-                  <Typography variant="body1">Total con descuento:</Typography> 
-                                 {" "}
-                  <Typography variant="body1" fontWeight="bold">
-                                        ${cartPriceInfo.priceUSD.toFixed(2)} USD
-                                     {" "}
+                  <Typography variant="h6" fontWeight="bold">
+                    Total Original:
                   </Typography>
-                                 {" "}
+                  <Typography variant="h6" fontWeight="bold">
+                    ${cartPriceInfo?.originalPriceUSD?.toFixed(2) || "0.00"} USD
+                  </Typography>
                 </Box>
-                               {" "}
-                <Typography
-                  variant="caption"
-                  color="textSecondary"
-                  display="block"
-                >
-                                    💰 Equivale a{" "}
-                  {cartPriceInfo.priceBS.toFixed(2)} BS (tasa                  
-                  oficial)                {" "}
+
+                <Typography variant="body2" color="textSecondary">
+                  💰 Equivale a {cartPriceInfo?.priceBS?.toFixed(2) || "0.00"}{" "}
+                  BS (tasa oficial)
                 </Typography>
-                               {" "}
-                <Typography variant="h6" sx={{ mt: 1 }}>
-                                    Total: ${cartPriceInfo.priceUSD.toFixed(2)}{" "}
-                  USD                {" "}
+
+                <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                  📊 Tasa oficial:{" "}
+                  {cartPriceInfo?.rates?.official?.toFixed(2) || "0.00"} BS/USD
                 </Typography>
-                             {" "}
+                <Typography variant="caption" display="block">
+                  💸 Tasa paralela:{" "}
+                  {cartPriceInfo?.rates?.parallel?.toFixed(2) || "0.00"} BS/USD
+                </Typography>
               </Box>
-              {/* En el alert de información de pago - Paso 2 */}
-              {paymentMethod && exchangeInfo && (
-                <Alert severity="info" sx={{ mb: 3 }} icon={false}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    💡 {paymentInfo.advantage}
-                  </Typography>
 
-                  {/* Para métodos USD */}
-                  {["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(
-                    paymentMethod
-                  ) &&
-                    exchangeInfo.savings && (
-                      <Box>
-                        <Typography variant="body2">
-                          <strong>Precio regular:</strong>{" "}
-                          {exchangeInfo.savings.amountBSParallel.toFixed(2)} BS
-                        </Typography>
-                        <Typography variant="body2">
-                          <strong>Tu precio:</strong> $
-                          {getCartTotalUSD().toFixed(2)} USD
-                        </Typography>
-                        <Typography
-                          variant="h6"
-                          color="success.main"
-                          sx={{ mt: 1 }}
-                        >
-                          ✅ Ahorras {exchangeInfo.savings.savingsPercentage}%
-                        </Typography>
-                        <Typography variant="body2">
-                          Equivale a{" "}
-                          {exchangeInfo.savings.amountBSOfficial.toFixed(2)} BS
-                          (tasa oficial)
-                        </Typography>
-                      </Box>
-                    )}
-
-                  {/* Para métodos BS */}
-                  {(paymentMethod === "PAGO_MOVIL" ||
-                    paymentMethod === "CASH_BS") &&
-                    exchangeInfo.amountBS && (
-                      <Box>
-                        <Typography variant="body2">
-                          <strong>Total a pagar:</strong>{" "}
-                          {exchangeInfo.amountBS.toFixed(2)} BS
-                        </Typography>
-                        <Typography variant="body2">
-                          <strong>Tasa oficial:</strong> {exchangeInfo.rate}{" "}
-                          BS/USD
-                        </Typography>
-                      </Box>
-                    )}
-                </Alert>
-              )}
               <Button
                 variant="contained"
                 fullWidth
@@ -500,7 +455,7 @@ const CheckoutPage = () => {
           </Grid>
         </Grid>
       )}
-
+      {/* Los pasos 2 y 3 continúan... */}
       {/* Paso 2: Método de Pago */}
       {activeStep === 1 && (
         <Grid container spacing={4}>
@@ -531,21 +486,50 @@ const CheckoutPage = () => {
                   <Typography variant="subtitle2" gutterBottom>
                     💡 {paymentInfo.advantage}
                   </Typography>
-                  <Typography variant="body2">
-                    {exchangeInfo.message}
-                  </Typography>
-                  {exchangeInfo.amountBS && (
-                    <Typography variant="h6" sx={{ mt: 1 }}>
-                      Total a pagar:{" "}
-                      <strong>{exchangeInfo.amountBS.toFixed(2)} BS</strong>
-                    </Typography>
-                  )}
-                  {exchangeInfo.savings && (
-                    <Typography variant="body2" color="success.main">
-                      ✅ Ahorras aproximadamente{" "}
-                      {exchangeInfo.savings.savingsPercentage}% vs tasa paralela
-                    </Typography>
-                  )}
+
+                  {/* Para métodos USD */}
+                  {["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(
+                    paymentMethod
+                  ) &&
+                    exchangeInfo.savings && (
+                      <Box>
+                        <Typography variant="body2">
+                          <strong>Precio regular (BS paralelo):</strong>{" "}
+                          {exchangeInfo.savings.amountBSParallel.toFixed(2)} BS
+                        </Typography>
+                        <Typography variant="body2">
+                          <strong>Tu precio en USD:</strong> $
+                          {getFinalPrice().toFixed(2)} USD
+                        </Typography>
+                        <Typography variant="body2">
+                          <strong>Equivalente en BS (oficial):</strong>{" "}
+                          {exchangeInfo.savings.amountBSOfficial.toFixed(2)} BS
+                        </Typography>
+                        <Typography
+                          variant="h6"
+                          color="success.main"
+                          sx={{ mt: 1 }}
+                        >
+                          ✅ Ahorras {exchangeInfo.savings.savingsPercentage}%
+                        </Typography>
+                      </Box>
+                    )}
+
+                  {/* Para métodos BS */}
+                  {(paymentMethod === "PAGO_MOVIL" ||
+                    paymentMethod === "CASH_BS") &&
+                    exchangeInfo.amountBS && (
+                      <Box>
+                        <Typography variant="body2">
+                          <strong>Total a pagar:</strong>{" "}
+                          {exchangeInfo.amountBS.toFixed(2)} BS
+                        </Typography>
+                        <Typography variant="body2">
+                          <strong>Tasa oficial:</strong> {exchangeInfo.rate}{" "}
+                          BS/USD
+                        </Typography>
+                      </Box>
+                    )}
                 </Alert>
               )}
 
@@ -686,12 +670,23 @@ const CheckoutPage = () => {
                 />
 
                 <Typography variant="h6" color="primary.main">
-                  Total: ${getCartTotalUSD().toFixed(2)} USD
+                  Total: ${getFinalPrice().toFixed(2)} USD
                 </Typography>
 
                 {exchangeInfo?.amountBS && (
                   <Typography variant="body1" sx={{ mt: 1 }}>
                     Equivale a: {exchangeInfo.amountBS.toFixed(2)} BS
+                  </Typography>
+                )}
+
+                {exchangeInfo?.savings && (
+                  <Typography
+                    variant="body2"
+                    color="success.main"
+                    sx={{ mt: 1 }}
+                  >
+                    ✅ Ahorras {exchangeInfo.savings.savingsPercentage}% vs tasa
+                    paralela
                   </Typography>
                 )}
               </Box>
@@ -719,7 +714,6 @@ const CheckoutPage = () => {
           </Grid>
         </Grid>
       )}
-
       {/* Paso 3: Confirmar Pedido */}
       {activeStep === 2 && (
         <Grid container spacing={4}>
@@ -741,34 +735,51 @@ const CheckoutPage = () => {
               </Alert>
 
               <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle1" gutterBottom>
+                <Typography variant="subtitle1" gutterBottom component="div">
                   Detalles del Pago:
                 </Typography>
-                <Typography>
-                  <strong>Método:</strong> {paymentInfo.name}
-                </Typography>
-                <Typography>
-                  <strong>Remitente:</strong> {paymentDetails.senderName}
-                </Typography>
-                {paymentDetails.senderPhone && (
-                  <Typography>
-                    <strong>Teléfono:</strong> {paymentDetails.senderPhone}
+                <Box component="div">
+                  <Typography variant="body2" component="p">
+                    <strong>Método:</strong> {paymentInfo.name}
                   </Typography>
-                )}
-                {paymentDetails.reference && (
-                  <Typography>
-                    <strong>Referencia:</strong> {paymentDetails.reference}
+                  <Typography variant="body2" component="p">
+                    <strong>Remitente:</strong> {paymentDetails.senderName}
                   </Typography>
-                )}
-                <Typography>
-                  <strong>Total:</strong> ${getCartTotalUSD().toFixed(2)} USD
-                </Typography>
-                {exchangeInfo?.amountBS && (
-                  <Typography>
-                    <strong>Equivalente:</strong>{" "}
-                    {exchangeInfo.amountBS.toFixed(2)} BS
+                  {paymentDetails.senderPhone && (
+                    <Typography variant="body2" component="p">
+                      <strong>Teléfono:</strong> {paymentDetails.senderPhone}
+                    </Typography>
+                  )}
+                  {paymentDetails.reference && (
+                    <Typography variant="body2" component="p">
+                      <strong>Referencia:</strong> {paymentDetails.reference}
+                    </Typography>
+                  )}
+                  <Typography variant="body2" component="p">
+                    <strong>Total Original:</strong> $
+                    {getCartTotalUSD().toFixed(2)} USD
                   </Typography>
-                )}
+                  <Typography variant="body2" component="p">
+                    <strong>Total a Pagar:</strong> $
+                    {getFinalPrice().toFixed(2)} USD
+                  </Typography>
+                  {exchangeInfo?.amountBS && (
+                    <Typography variant="body2" component="p">
+                      <strong>Equivalente en BS:</strong>{" "}
+                      {exchangeInfo.amountBS.toFixed(2)} BS
+                    </Typography>
+                  )}
+                  {exchangeInfo?.savings && (
+                    <Typography
+                      variant="body2"
+                      component="p"
+                      color="success.main"
+                    >
+                      ✅ Ahorras {exchangeInfo.savings.savingsPercentage}% ($
+                      {(getCartTotalUSD() - getFinalPrice()).toFixed(2)} USD)
+                    </Typography>
+                  )}
+                </Box>
               </Box>
 
               <Box sx={{ p: 2, bgcolor: "success.light", borderRadius: 1 }}>
@@ -814,6 +825,7 @@ const CheckoutPage = () => {
           </Grid>
         </Grid>
       )}
+      {/* ... (el resto del código del checkout permanece similar pero con las correcciones de precio) */}
     </Container>
   );
 };

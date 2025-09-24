@@ -4,12 +4,21 @@ export class ExchangeRateService {
       const response = await fetch(
         "https://ve.dolarapi.com/v1/dolares/oficial"
       );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
-      console.log("✅ Tasa oficial obtenida:", data.promedio);
-      return data.promedio || 170;
+      console.log("✅ Tasa oficial obtenida:", data);
+
+      // Probar diferentes propiedades que podría tener la respuesta
+      return (
+        data.promedio_real || data.promedio || data.venta || data.compra || 170
+      );
     } catch (error) {
       console.error("❌ Error obteniendo tasa oficial:", error);
-      return 170;
+      return 170; // Valor por defecto
     }
   }
 
@@ -18,12 +27,20 @@ export class ExchangeRateService {
       const response = await fetch(
         "https://ve.dolarapi.com/v1/dolares/paralelo"
       );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
-      console.log("✅ Tasa paralela obtenida:", data.promedio);
-      return data.promedio || 280;
+      console.log("✅ Tasa paralela obtenida:", data);
+
+      return (
+        data.promedio_real || data.promedio || data.venta || data.compra || 280
+      );
     } catch (error) {
       console.error("❌ Error obteniendo tasa paralela:", error);
-      return 280;
+      return 280; // Valor por defecto
     }
   }
 
@@ -42,45 +59,36 @@ export class ExchangeRateService {
         `💱 Tasas - Oficial: ${officialRate}, Paralela: ${parallelRate}`
       );
 
-      // Métodos que pagan en USD directamente (Zelle, Crypto, Zinli, Efectivo USD)
+      // Métodos que pagan en USD directamente
       const usdMethods = ["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"];
 
       if (usdMethods.includes(method)) {
-        // Cuando pagas en USD directo, el ahorro es vs pagar en BS a tasa paralela
         const amountBSParallel = amountUSD * parallelRate;
         const amountBSOfficial = amountUSD * officialRate;
 
-        // El ahorro es la diferencia entre lo que pagarías en BS a paralelo vs oficial
         const savingsAmount = amountBSParallel - amountBSOfficial;
         const savingsPercentage = (
           (savingsAmount / amountBSParallel) *
           100
         ).toFixed(1);
 
-        console.log(
-          `💰 Ahorro calculado: ${savingsPercentage}% (${savingsAmount.toFixed(
-            2
-          )} BS)`
-        );
-
         return {
           amountUSD,
-          amountBS: null, // No se paga en BS
+          amountBS: null,
           rate: null,
           savings: {
             parallelRate,
             officialRate,
+            amountBSParallel,
+            amountBSOfficial,
             savingsAmount,
             savingsPercentage,
-            explanation: `Pagas $${amountUSD} USD en lugar de ${amountBSParallel.toFixed(
-              2
-            )} BS`,
           },
           message: "🎯 Pago directo en USD - Obtienes el mejor precio",
         };
       }
 
-      // Métodos que pagan en BS a tasa oficial (Pago Móvil, Efectivo BS)
+      // Métodos que pagan en BS a tasa oficial
       if (method === "PAGO_MOVIL" || method === "CASH_BS") {
         const amountBS = amountUSD * officialRate;
 
@@ -88,7 +96,7 @@ export class ExchangeRateService {
           amountUSD,
           amountBS: Math.round(amountBS * 100) / 100,
           rate: officialRate,
-          savings: null, // No hay ahorro, pagas a tasa oficial
+          savings: null,
           message: `💸 Pago en BS a tasa oficial: ${officialRate} BS/USD`,
         };
       }

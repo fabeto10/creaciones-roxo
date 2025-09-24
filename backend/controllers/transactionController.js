@@ -13,7 +13,7 @@ export const calculatePayment = async (req, res) => {
     }
 
     const result = await ExchangeRateService.calculatePriceInBolivares(
-      amountUSD,
+      parseFloat(amountUSD),
       method
     );
     const methodInfo = ExchangeRateService.getPaymentMethodInfo(method);
@@ -37,14 +37,9 @@ export const createTransaction = async (req, res) => {
     console.log("📋 Request body:", req.body);
     console.log("📎 Request file:", req.file);
 
-    // Los campos vienen en req.body para FormData
     const { items, paymentMethod, paymentDetails } = req.body;
 
     if (!items || !paymentMethod) {
-      console.log("❌ Missing required fields:", {
-        items: !!items,
-        paymentMethod: !!paymentMethod,
-      });
       return res.status(400).json({
         message: "Items and payment method are required",
       });
@@ -70,7 +65,6 @@ export const createTransaction = async (req, res) => {
     }
 
     console.log("✅ Parsed items:", parsedItems);
-    console.log("✅ Parsed payment details:", parsedPaymentDetails);
 
     // Calcular total en USD
     const totalUSD = parsedItems.reduce((total, item) => {
@@ -78,29 +72,43 @@ export const createTransaction = async (req, res) => {
       return total + itemTotal;
     }, 0);
 
-    console.log("💰 Total USD calculated:", totalUSD);
+    let finalAmountUSD = totalUSD;
+    let discountPercentage = 0;
 
-    // Obtener información de la tasa de cambio
-    let transactionData = {
+    // Obtener tasas de cambio
+    const [officialRate, parallelRate] = await Promise.all([
+      ExchangeRateService.getOfficialRate(),
+      ExchangeRateService.getParallelRate(),
+    ]);
+
+    // Aplicar descuento para métodos en USD
+    if (["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(paymentMethod)) {
+      discountPercentage = ((parallelRate - officialRate) / parallelRate) * 100;
+      finalAmountUSD = totalUSD * (1 - discountPercentage / 100);
+
+      console.log(`💰 Descuento aplicado: ${discountPercentage.toFixed(1)}%`);
+      console.log(
+        `💰 Precio original: $${totalUSD} → Precio final: $${finalAmountUSD}`
+      );
+    }
+
+    // Preparar datos de la transacción
+    const transactionData = {
       userId,
-      amountUSD: totalUSD,
+      amountUSD: finalAmountUSD,
+      originalAmountUSD: totalUSD,
       paymentMethod,
       status: "PENDING",
+      discountPercentage: discountPercentage > 0 ? discountPercentage : null,
     };
 
     // Para métodos en BS, guardar la conversión
     if (paymentMethod === "PAGO_MOVIL" || paymentMethod === "CASH_BS") {
-      const rates = await Promise.all([
-        ExchangeRateService.getOfficialRate(),
-        ExchangeRateService.getParallelRate(),
-      ]);
-
-      transactionData.amountBS = totalUSD * rates[0];
-      transactionData.exchangeRate = rates[0];
+      transactionData.amountBS = totalUSD * officialRate;
+      transactionData.exchangeRate = officialRate;
     }
 
     // Para métodos que requieren referencia o información adicional
-    // USAR parsedPaymentDetails en lugar de paymentDetails
     if (paymentMethod === "PAGO_MOVIL") {
       if (!parsedPaymentDetails.reference || !parsedPaymentDetails.senderName) {
         return res.status(400).json({
@@ -110,32 +118,59 @@ export const createTransaction = async (req, res) => {
       transactionData.reference = parsedPaymentDetails.reference;
       transactionData.senderName = parsedPaymentDetails.senderName;
       transactionData.senderPhone = parsedPaymentDetails.senderPhone || "";
-    }
-
-
-    if (["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(paymentMethod)) {
-      const parallelRate = await ExchangeRateService.getParallelRate();
-      transactionData.exchangeRate = parallelRate; // Guardar tasa paralela como referencia
-      if (!parsedPaymentDetails.senderName) {
-        return res.status(400).json({
-          message: "Sender name is required",
-        });
-      }
-      transactionData.senderName = parsedPaymentDetails.senderName;
+    } else {
+      // Para otros métodos, guardar el nombre y teléfono si están disponibles
+      transactionData.senderName = parsedPaymentDetails.senderName || "";
       transactionData.senderPhone = parsedPaymentDetails.senderPhone || "";
     }
 
     // Manejar la imagen del comprobante si existe
     if (req.file) {
       transactionData.screenshot = `/uploads/${req.file.filename}`;
-      transactionData.status = "VERIFYING"; // Cambiar estado si hay comprobante
+      transactionData.status = "VERIFYING";
     }
 
     console.log("📊 Transaction data to create:", transactionData);
 
     // Crear la transacción
+    const transactionDataForPrisma = {
+      amountUSD: finalAmountUSD,
+      paymentMethod: paymentMethod,
+      status: transactionData.status,
+    //   discountPercentage: transactionData.discountPercentage,
+    };
+
+    // Solo agregar user si userId existe
+    if (userId) {
+      transactionDataForPrisma.user = {
+        connect: { id: userId },
+      };
+    }
+
+    // Agregar campos condicionales
+    if (transactionData.amountBS) {
+      transactionDataForPrisma.amountBS = transactionData.amountBS;
+    }
+    if (transactionData.exchangeRate) {
+      transactionDataForPrisma.exchangeRate = transactionData.exchangeRate;
+    }
+    if (transactionData.reference) {
+      transactionDataForPrisma.reference = transactionData.reference;
+    }
+    if (transactionData.senderName) {
+      transactionDataForPrisma.senderName = transactionData.senderName;
+    }
+    if (transactionData.senderPhone) {
+      transactionDataForPrisma.senderPhone = transactionData.senderPhone;
+    }
+    if (transactionData.screenshot) {
+      transactionDataForPrisma.screenshot = transactionData.screenshot;
+    }
+
+    console.log("📊 Transaction data for Prisma:", transactionDataForPrisma);
+
     const transaction = await prisma.transaction.create({
-      data: transactionData,
+      data: transactionDataForPrisma,
       include: {
         user: {
           select: {
@@ -150,24 +185,27 @@ export const createTransaction = async (req, res) => {
 
     console.log("✅ Transaction created:", transaction.id);
 
-    // Crear la orden asociada - USAR parsedItems en lugar de items
+    const orderData = {
+      user: { connect: { id: userId } },
+      transaction: { connect: { id: transaction.id } },
+      items: parsedItems,
+      totalUSD: finalAmountUSD,
+      paymentMethod: paymentMethod,
+      paymentDetails: parsedPaymentDetails,
+      status: transactionData.status === "VERIFYING" ? "verifying" : "pending",
+    };
+
+    if (transactionData.amountBS) {
+      orderData.totalBS = transactionData.amountBS;
+    }
+
     const order = await prisma.order.create({
-      data: {
-        userId,
-        transactionId: transaction.id,
-        items: parsedItems, // Usar los items parseados
-        totalUSD: totalUSD,
-        totalBS: transactionData.amountBS || null,
-        paymentMethod: paymentMethod,
-        paymentDetails: parsedPaymentDetails, // Usar los detalles parseados
-        status:
-          transactionData.status === "VERIFYING" ? "verifying" : "pending",
-      },
+      data: orderData,
     });
 
     console.log("✅ Order created:", order.id);
 
-    // Para métodos que requieren comprobante, generar instrucciones específicas
+    // Generar instrucciones de pago
     const instructions = generatePaymentInstructions(
       paymentMethod,
       transaction

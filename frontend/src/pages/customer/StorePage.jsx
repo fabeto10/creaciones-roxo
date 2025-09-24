@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Container,
   Grid,
@@ -13,19 +13,19 @@ import {
   Pagination,
   Drawer,
   Button,
-  CircularProgress
-} from '@mui/material';
-import { FilterList, Search, Tune } from '@mui/icons-material';
-import { productsAPI } from '../../services/products';
-import ProductCard from '../../components/products/ProductCard';
+  CircularProgress,
+} from "@mui/material";
+import { FilterList, Search, Tune } from "@mui/icons-material";
+import { productsAPI } from "../../services/products";
+import ProductCard from "../../components/products/ProductCard";
 
 const StorePage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [priceRange, setPriceRange] = useState('');
-  const [sortBy, setSortBy] = useState('name');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [priceRange, setPriceRange] = useState("");
+  const [sortBy, setSortBy] = useState("name");
   const [currentPage, setCurrentPage] = useState(1);
   const [filterOpen, setFilterOpen] = useState(false);
   const productsPerPage = 9;
@@ -38,16 +38,29 @@ const StorePage = () => {
     try {
       setLoading(true);
       const response = await productsAPI.getProducts();
-      setProducts(response.data.filter(p => p.isActive));
+      const activeProducts = response.data.filter((p) => p.isActive);
+
+      // DEBUG: Verificar imágenes
+      activeProducts.forEach((product) => {
+        console.log(`📊 ${product.name}:`, {
+          images: product.images,
+          imageCount: product.images?.length || 0,
+          firstImage: product.images?.[0],
+        });
+      });
+
+      setProducts(activeProducts);
     } catch (error) {
-      console.error('Error loading products:', error);
+      console.error("Error loading products:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const categories = useMemo(() => 
-    [...new Set(products.map(product => product.category).filter(Boolean))], 
+  const categories = useMemo(
+    () => [
+      ...new Set(products.map((product) => product.category).filter(Boolean)),
+    ],
     [products]
   );
 
@@ -56,34 +69,41 @@ const StorePage = () => {
 
     // Filtro por búsqueda
     if (searchTerm) {
-      filtered = filtered.filter(product =>
-        product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      filtered = filtered.filter(
+        (product) =>
+          product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          product.description
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          product.tags?.some((tag) =>
+            tag.toLowerCase().includes(searchTerm.toLowerCase())
+          )
       );
     }
 
     // Filtro por categoría
     if (categoryFilter) {
-      filtered = filtered.filter(product => product.category === categoryFilter);
+      filtered = filtered.filter(
+        (product) => product.category === categoryFilter
+      );
     }
 
     // Filtro por precio
     if (priceRange) {
-      const [min, max] = priceRange.split('-').map(Number);
-      filtered = filtered.filter(product => 
-        product.basePrice >= min && product.basePrice <= max
+      const [min, max] = priceRange.split("-").map(Number);
+      filtered = filtered.filter(
+        (product) => product.basePrice >= min && product.basePrice <= max
       );
     }
 
     // Ordenamiento
     filtered.sort((a, b) => {
       switch (sortBy) {
-        case 'price-low':
+        case "price-low":
           return a.basePrice - b.basePrice;
-        case 'price-high':
+        case "price-high":
           return b.basePrice - a.basePrice;
-        case 'name':
+        case "name":
         default:
           return a.name?.localeCompare(b.name);
       }
@@ -95,12 +115,24 @@ const StorePage = () => {
   // Paginación
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-  const currentProducts = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
+  const currentProducts = filteredProducts.slice(
+    indexOfFirstProduct,
+    indexOfLastProduct
+  );
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+      <Container
+        maxWidth="lg"
+        sx={{
+          py: 4,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "50vh",
+        }}
+      >
         <CircularProgress />
       </Container>
     );
@@ -110,7 +142,11 @@ const StorePage = () => {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header de la tienda */}
       <Box textAlign="center" mb={4}>
-        <Typography variant="h3" className="roxo-text-gradient" fontWeight="bold">
+        <Typography
+          variant="h3"
+          className="roxo-text-gradient"
+          fontWeight="bold"
+        >
           🎀 Tienda Creaciones Roxo
         </Typography>
         <Typography variant="h6" color="textSecondary">
@@ -119,27 +155,37 @@ const StorePage = () => {
       </Box>
 
       {/* Filtros y búsqueda */}
-      <Box sx={{ mb: 4, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+      <Box
+        sx={{
+          mb: 4,
+          display: "flex",
+          gap: 2,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
         <TextField
           placeholder="Buscar pulseras, dijes..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           InputProps={{
-            startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
+            startAdornment: <Search sx={{ mr: 1, color: "text.secondary" }} />,
           }}
           sx={{ minWidth: 200, flexGrow: 1 }}
         />
-        
-        <Button 
-          variant="outlined" 
+
+        <Button
+          variant="outlined"
           startIcon={<Tune />}
           onClick={() => setFilterOpen(true)}
-          sx={{ display: { xs: 'flex', md: 'none' } }}
+          sx={{ display: { xs: "flex", md: "none" } }}
         >
           Filtros
         </Button>
 
-        <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2, flexWrap: 'wrap' }}>
+        <Box
+          sx={{ display: { xs: "none", md: "flex" }, gap: 2, flexWrap: "wrap" }}
+        >
           <FormControl sx={{ minWidth: 150 }}>
             <InputLabel>Categoría</InputLabel>
             <Select
@@ -148,8 +194,10 @@ const StorePage = () => {
               onChange={(e) => setCategoryFilter(e.target.value)}
             >
               <MenuItem value="">Todas</MenuItem>
-              {categories.map(category => (
-                <MenuItem key={category} value={category}>{category}</MenuItem>
+              {categories.map((category) => (
+                <MenuItem key={category} value={category}>
+                  {category}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -185,31 +233,40 @@ const StorePage = () => {
       </Box>
 
       {/* Información de resultados */}
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+      <Box
+        sx={{
+          mb: 2,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 1,
+        }}
+      >
         <Typography variant="body2" color="textSecondary">
           {filteredProducts.length} productos encontrados
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           {categoryFilter && (
-            <Chip 
-              label={`Categoría: ${categoryFilter}`} 
-              onDelete={() => setCategoryFilter('')}
+            <Chip
+              label={`Categoría: ${categoryFilter}`}
+              onDelete={() => setCategoryFilter("")}
               size="small"
             />
           )}
           {priceRange && (
-            <Chip 
-              label={`Precio: ${priceRange}`} 
-              onDelete={() => setPriceRange('')}
+            <Chip
+              label={`Precio: ${priceRange}`}
+              onDelete={() => setPriceRange("")}
               size="small"
             />
           )}
           {(categoryFilter || priceRange) && (
-            <Button 
-              size="small" 
+            <Button
+              size="small"
               onClick={() => {
-                setCategoryFilter('');
-                setPriceRange('');
+                setCategoryFilter("");
+                setPriceRange("");
               }}
             >
               Limpiar
@@ -229,9 +286,9 @@ const StorePage = () => {
 
       {/* Paginación */}
       {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <Pagination 
-            count={totalPages} 
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+          <Pagination
+            count={totalPages}
             page={currentPage}
             onChange={(e, page) => setCurrentPage(page)}
             color="primary"
@@ -248,13 +305,13 @@ const StorePage = () => {
           <Typography variant="body2" color="textSecondary">
             Intenta con otros filtros o términos de búsqueda
           </Typography>
-          <Button 
-            variant="outlined" 
+          <Button
+            variant="outlined"
             sx={{ mt: 2 }}
             onClick={() => {
-              setSearchTerm('');
-              setCategoryFilter('');
-              setPriceRange('');
+              setSearchTerm("");
+              setCategoryFilter("");
+              setPriceRange("");
             }}
           >
             Limpiar filtros

@@ -37,8 +37,8 @@ export const CartProvider = ({ children }) => {
       const parallelData = await parallelRes.json();
       
       const newRates = {
-        official: officialData.promedio || 170,
-        parallel: parallelData.promedio || 280,
+        official: officialData.promedio_real || officialData.promedio || officialData.venta || 170,
+        parallel: parallelData.promedio_real || parallelData.promedio || parallelData.venta || 280,
         lastUpdated: new Date()
       };
       
@@ -49,36 +49,65 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // Calcular precios para diferentes métodos de pago
-  const calculatePriceInfo = (priceUSD) => {
-    const priceBSOfficial = priceUSD * exchangeRates.official;
-    const priceBSParallel = priceUSD * exchangeRates.parallel;
-    const savingsAmount = priceBSParallel - priceBSOfficial;
-    const savingsPercentage = ((savingsAmount / priceBSParallel) * 100).toFixed(1);
+  // Calcular el porcentaje de descuento real
+  const calculateDiscountPercentage = () => {
+    if (!exchangeRates.parallel || !exchangeRates.official || exchangeRates.parallel === exchangeRates.official) {
+      return 40; // Descuento por defecto si no hay tasas
+    }
+    const discount = ((exchangeRates.parallel - exchangeRates.official) / exchangeRates.parallel) * 100;
+    return Math.min(Math.max(discount, 35), 45); // Limitar entre 35% y 45%
+  };
+
+  // Calcular precio con descuento para métodos USD
+  const calculateDiscountedPriceUSD = (priceUSD) => {
+    const discountPercentage = calculateDiscountPercentage();
+    const discountedPrice = priceUSD * (1 - (discountPercentage / 100));
     
     return {
-      // Precio principal (en BS a tasa oficial)
-      priceBS: priceBSOfficial,
-      // Precio en USD (para métodos USD)
-      priceUSD: priceUSD,
-      // Información de ahorro (si paga en USD)
-      savings: {
-        amount: savingsAmount,
-        percentage: savingsPercentage,
-        priceBSParallel: priceBSParallel
-      },
-      // Tasas utilizadas
-      rates: {
-        official: exchangeRates.official,
-        parallel: exchangeRates.parallel
-      }
+      originalPriceUSD: parseFloat(priceUSD),
+      discountedPriceUSD: parseFloat(discountedPrice.toFixed(2)),
+      discountPercentage: parseFloat(discountPercentage.toFixed(1)),
+      priceBSOfficial: priceUSD * exchangeRates.official,
+      priceBSParallel: priceUSD * exchangeRates.parallel,
+      savingsAmountBS: (priceUSD * exchangeRates.parallel) - (priceUSD * exchangeRates.official),
+      savingsAmountUSD: priceUSD - discountedPrice
     };
   };
 
-  // Calcular precio para el carrito completo
+  // Calcular información completa de precios
+  const calculatePriceInfo = (priceUSD) => {
+    const discountInfo = calculateDiscountedPriceUSD(priceUSD);
+    
+    return {
+      // Precio principal (en BS a tasa oficial) - para mostrar como precio "normal"
+      priceBS: discountInfo.priceBSOfficial,
+      
+      // Precios en USD
+      originalPriceUSD: discountInfo.originalPriceUSD,
+      discountedPriceUSD: discountInfo.discountedPriceUSD,
+      
+      // Información de descuento
+      discount: {
+        percentage: discountInfo.discountPercentage,
+        amountUSD: discountInfo.savingsAmountUSD,
+        amountBS: discountInfo.savingsAmountBS
+      },
+      
+      // Información de tasas
+      rates: {
+        official: exchangeRates.official,
+        parallel: exchangeRates.parallel
+      },
+      
+      // Precios de referencia
+      priceBSParallel: discountInfo.priceBSParallel
+    };
+  };
+
+  // Calcular para el carrito completo
   const calculateCartPriceInfo = () => {
-    const totalUSD = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-    return calculatePriceInfo(totalUSD);
+    const totalOriginalUSD = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return calculatePriceInfo(totalOriginalUSD);
   };
 
   const addToCart = (product, customization = {}) => {
@@ -86,14 +115,13 @@ export const CartProvider = ({ children }) => {
     const finalPriceUSD = calculateCustomPrice(product.basePrice, customization);
     const priceInfo = calculatePriceInfo(finalPriceUSD);
     
-    // Construir URL correcta para la imagen
     let productImage = '/images/placeholder-bracelet.jpg';
     
     if (product.images && product.images.length > 0) {
       const firstImage = product.images[0];
       if (firstImage.startsWith('http')) {
         productImage = firstImage;
-      } else if (firstImage.startsWith('/uploads/')) {
+      } else if (firstImage.startsWith('/')) {
         productImage = `http://localhost:5000${firstImage}`;
       } else {
         productImage = `http://localhost:5000/uploads/${firstImage}`;
@@ -103,14 +131,9 @@ export const CartProvider = ({ children }) => {
     const newItem = {
       id: customId,
       product: product,
-      customization: {
-        material: customization.material || product.availableMaterials?.[0]?.name || 'standard',
-        color: customization.color || product.availableColors?.[0] || 'standard',
-        charms: customization.charms || [],
-        notes: customization.notes || ''
-      },
+      customization: customization,
       quantity: 1,
-      price: finalPriceUSD, // Precio en USD
+      price: finalPriceUSD, // Precio original en USD
       image: productImage,
       priceInfo: priceInfo
     };
@@ -181,6 +204,7 @@ export const CartProvider = ({ children }) => {
     exchangeRates,
     calculatePriceInfo,
     calculateCartPriceInfo,
+    calculateDiscountPercentage,
     loadExchangeRates
   };
 
