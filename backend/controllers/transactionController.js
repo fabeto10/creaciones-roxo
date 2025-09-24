@@ -112,7 +112,10 @@ export const createTransaction = async (req, res) => {
       transactionData.senderPhone = parsedPaymentDetails.senderPhone || "";
     }
 
-    if (["ZELLE", "CRYPTO", "ZINLI"].includes(paymentMethod)) {
+
+    if (["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(paymentMethod)) {
+      const parallelRate = await ExchangeRateService.getParallelRate();
+      transactionData.exchangeRate = parallelRate; // Guardar tasa paralela como referencia
       if (!parsedPaymentDetails.senderName) {
         return res.status(400).json({
           message: "Sender name is required",

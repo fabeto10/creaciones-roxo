@@ -40,8 +40,15 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 const CheckoutPage = () => {
-  const { cartItems, getCartTotal, removeFromCart, updateQuantity, clearCart } =
-    useCart();
+  const {
+    cartItems,
+    getCartTotalUSD,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    calculateCartPriceInfo,
+  } = useCart();
+  const cartPriceInfo = calculateCartPriceInfo();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -89,7 +96,7 @@ const CheckoutPage = () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            amountUSD: getCartTotal(),
+            amountUSD: getCartTotalUSD(),
             method: paymentMethod,
           }),
         }
@@ -113,7 +120,7 @@ const CheckoutPage = () => {
     if (paymentMethod) {
       calculateExchange();
     }
-  }, [paymentMethod, getCartTotal()]);
+  }, [paymentMethod, getCartTotalUSD()]);
 
   const handlePaymentMethodChange = (event) => {
     const method = event.target.value;
@@ -357,82 +364,122 @@ const CheckoutPage = () => {
           </Grid>
 
           <Grid item xs={12} md={4}>
+                       {" "}
             <Paper elevation={2} sx={{ p: 3 }}>
+                           {" "}
               <Typography variant="h6" gutterBottom>
-                Resumen del Pedido
+                                Resumen del Pedido              {" "}
               </Typography>
-              <Divider sx={{ my: 2 }} />
-
-              {/* En el resumen del carrito */}
+                            <Divider sx={{ my: 2 }} />             {" "}
               <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Subtotal: ${getCartTotal().toFixed(2)}
+                               {" "}
+                <Box display="flex" justifyContent="space-between" mb={1}>
+                                   {" "}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ textDecoration: "line-through" }}
+                  >
+                                        Total regular:                  {" "}
+                  </Typography>
+                                   {" "}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ textDecoration: "line-through" }}
+                  >
+                                        $
+                    {cartPriceInfo.savings.priceBSParallel.toFixed(2)} BS      
+                               {" "}
+                  </Typography>
+                                 {" "}
+                </Box>
+                               {" "}
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  mb={1}
+                >
+                                   {" "}
+                  <Typography variant="body1">Total con descuento:</Typography> 
+                                 {" "}
+                  <Typography variant="body1" fontWeight="bold">
+                                        ${cartPriceInfo.priceUSD.toFixed(2)} USD
+                                     {" "}
+                  </Typography>
+                                 {" "}
+                </Box>
+                               {" "}
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  display="block"
+                >
+                                    💰 Equivale a{" "}
+                  {cartPriceInfo.priceBS.toFixed(2)} BS (tasa                  
+                  oficial)                {" "}
                 </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Envío: Gratis
-                </Typography>
-
-                {/* Mostrar equivalente en BS */}
-                {paymentMethod &&
-                  (paymentMethod === "PAGO_MOVIL" ||
-                    paymentMethod === "CASH_BS") &&
-                  exchangeInfo?.amountBS && (
-                    <Typography variant="body2" color="textSecondary">
-                      Equivalente: {exchangeInfo.amountBS.toFixed(2)} BS
-                    </Typography>
-                  )}
-
-                {/* Mostrar ahorro si paga en USD */}
-                {paymentMethod &&
-                  ["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(
-                    paymentMethod
-                  ) &&
-                  exchangeInfo?.savings && (
-                    <Typography variant="body2" color="success.main">
-                      ✅ Ahorras {exchangeInfo.savings.savingsPercentage}%
-                    </Typography>
-                  )}
-
+                               {" "}
                 <Typography variant="h6" sx={{ mt: 1 }}>
-                  Total: ${getCartTotal().toFixed(2)} USD
+                                    Total: ${cartPriceInfo.priceUSD.toFixed(2)}{" "}
+                  USD                {" "}
                 </Typography>
+                             {" "}
               </Box>
-
-              {/* En el alert de información de pago */}
+              {/* En el alert de información de pago - Paso 2 */}
               {paymentMethod && exchangeInfo && (
                 <Alert severity="info" sx={{ mb: 3 }} icon={false}>
                   <Typography variant="subtitle2" gutterBottom>
                     💡 {paymentInfo.advantage}
                   </Typography>
-                  <Typography variant="body2">
-                    {exchangeInfo.message}
-                  </Typography>
-                  {exchangeInfo.amountBS && (
-                    <Typography variant="h6" sx={{ mt: 1 }}>
-                      Total a pagar:{" "}
-                      <strong>{exchangeInfo.amountBS.toFixed(2)} BS</strong>
-                    </Typography>
-                  )}
-                  {exchangeInfo.savings && (
-                    <Box>
-                      <Typography
-                        variant="body2"
-                        color="success.main"
-                        sx={{ mt: 1 }}
-                      >
-                        ✅ Ahorras aproximadamente{" "}
-                        {exchangeInfo.savings.savingsPercentage}% vs tasa
-                        paralela
-                      </Typography>
-                      <Typography variant="caption" display="block">
-                        Pagas ${getCartTotal().toFixed(2)} USD en lugar de{" "}
-                        {exchangeInfo.savings.amountBSParallel.toFixed(2)} BS
-                      </Typography>
-                    </Box>
-                  )}
+
+                  {/* Para métodos USD */}
+                  {["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(
+                    paymentMethod
+                  ) &&
+                    exchangeInfo.savings && (
+                      <Box>
+                        <Typography variant="body2">
+                          <strong>Precio regular:</strong>{" "}
+                          {exchangeInfo.savings.amountBSParallel.toFixed(2)} BS
+                        </Typography>
+                        <Typography variant="body2">
+                          <strong>Tu precio:</strong> $
+                          {getCartTotalUSD().toFixed(2)} USD
+                        </Typography>
+                        <Typography
+                          variant="h6"
+                          color="success.main"
+                          sx={{ mt: 1 }}
+                        >
+                          ✅ Ahorras {exchangeInfo.savings.savingsPercentage}%
+                        </Typography>
+                        <Typography variant="body2">
+                          Equivale a{" "}
+                          {exchangeInfo.savings.amountBSOfficial.toFixed(2)} BS
+                          (tasa oficial)
+                        </Typography>
+                      </Box>
+                    )}
+
+                  {/* Para métodos BS */}
+                  {(paymentMethod === "PAGO_MOVIL" ||
+                    paymentMethod === "CASH_BS") &&
+                    exchangeInfo.amountBS && (
+                      <Box>
+                        <Typography variant="body2">
+                          <strong>Total a pagar:</strong>{" "}
+                          {exchangeInfo.amountBS.toFixed(2)} BS
+                        </Typography>
+                        <Typography variant="body2">
+                          <strong>Tasa oficial:</strong> {exchangeInfo.rate}{" "}
+                          BS/USD
+                        </Typography>
+                      </Box>
+                    )}
                 </Alert>
               )}
-
               <Button
                 variant="contained"
                 fullWidth
@@ -441,7 +488,6 @@ const CheckoutPage = () => {
               >
                 Continuar al Pago
               </Button>
-
               <Button
                 variant="outlined"
                 fullWidth
@@ -640,7 +686,7 @@ const CheckoutPage = () => {
                 />
 
                 <Typography variant="h6" color="primary.main">
-                  Total: ${getCartTotal().toFixed(2)} USD
+                  Total: ${getCartTotalUSD().toFixed(2)} USD
                 </Typography>
 
                 {exchangeInfo?.amountBS && (
@@ -715,7 +761,7 @@ const CheckoutPage = () => {
                   </Typography>
                 )}
                 <Typography>
-                  <strong>Total:</strong> ${getCartTotal().toFixed(2)} USD
+                  <strong>Total:</strong> ${getCartTotalUSD().toFixed(2)} USD
                 </Typography>
                 {exchangeInfo?.amountBS && (
                   <Typography>

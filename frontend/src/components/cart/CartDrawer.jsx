@@ -11,15 +11,18 @@ import {
   ListItemSecondaryAction,
   Divider,
   Chip,
-  Paper
+  Paper,
+  Tooltip
 } from '@mui/material';
-import { Close, Add, Remove, Delete, ShoppingCart } from '@mui/icons-material';
+import { Close, Add, Remove, Delete, ShoppingCart, Savings } from '@mui/icons-material';
 import { useCart } from '../../contexts/CartContext';
 import { useNavigate } from 'react-router-dom';
 
 const CartDrawer = () => {
-  const { cartItems, isCartOpen, setIsCartOpen, updateQuantity, removeFromCart, getCartTotal, clearCart } = useCart();
+  const { cartItems, isCartOpen, setIsCartOpen, updateQuantity, removeFromCart, calculateCartPriceInfo, clearCart } = useCart();
   const navigate = useNavigate();
+
+  const cartPriceInfo = calculateCartPriceInfo();
 
   const handleQuantityChange = (itemId, newQuantity) => {
     updateQuantity(itemId, newQuantity);
@@ -63,9 +66,6 @@ const CartDrawer = () => {
           <Typography variant="h6" color="textSecondary" gutterBottom>
             Tu carrito está vacío
           </Typography>
-          <Typography variant="body2" color="textSecondary">
-            ¡Agrega algunos productos increíbles!
-          </Typography>
           <Button 
             variant="contained" 
             sx={{ mt: 2 }}
@@ -104,20 +104,12 @@ const CartDrawer = () => {
                         secondary={
                           <Box component="div">
                             <Typography variant="body2" component="span">
-                              Material: {item.customization.material}
+                              {item.priceInfo.priceBS.toFixed(2)} BS
                             </Typography>
                             <br />
-                            <Typography variant="body2" component="span">
-                              Color: {item.customization.color}
+                            <Typography variant="body2" component="span" color="success.main">
+                              ${item.price.toFixed(2)} USD c/u
                             </Typography>
-                            {item.customization.charms.length > 0 && (
-                              <>
-                                <br />
-                                <Typography variant="body2" component="span">
-                                  Dijes: {item.customization.charms.length}
-                                </Typography>
-                              </>
-                            )}
                           </Box>
                         }
                       />
@@ -150,9 +142,14 @@ const CartDrawer = () => {
                         <Add />
                       </IconButton>
                     </Box>
-                    <Typography variant="h6" color="primary">
-                      ${(item.price * item.quantity).toFixed(2)}
-                    </Typography>
+                    <Box textAlign="right">
+                      <Typography variant="h6" color="primary">
+                        {(item.priceInfo.priceBS * item.quantity).toFixed(2)} BS
+                      </Typography>
+                      <Typography variant="caption" color="success.main">
+                        (${(item.price * item.quantity).toFixed(2)} USD)
+                      </Typography>
+                    </Box>
                   </Box>
                 </Box>
               </ListItem>
@@ -160,20 +157,70 @@ const CartDrawer = () => {
           </List>
 
           <Paper elevation={2} sx={{ p: 2, mt: 2 }}>
+            {/* PRECIO TOTAL EN BS */}
             <Box display="flex" justifyContent="space-between" mb={1}>
-              <Typography variant="body1">Subtotal:</Typography>
-              <Typography variant="body1">${getCartTotal().toFixed(2)}</Typography>
-            </Box>
-            <Box display="flex" justifyContent="space-between" mb={2}>
-              <Typography variant="body1">Envío:</Typography>
-              <Typography variant="body1">Gratis</Typography>
-            </Box>
-            <Divider sx={{ my: 1 }} />
-            <Box display="flex" justifyContent="space-between" mb={2}>
-              <Typography variant="h6">Total:</Typography>
-              <Typography variant="h6" color="primary">
-                ${getCartTotal().toFixed(2)}
+              <Typography variant="body1" fontWeight="bold">
+                Total:
               </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {cartPriceInfo.priceBS.toFixed(2)} BS
+              </Typography>
+            </Box>
+
+            {/* DESCUENTO POR PAGO EN USD */}
+            <Box sx={{ 
+              bgcolor: 'success.light', 
+              p: 1, 
+              borderRadius: 1, 
+              mb: 2,
+              border: '1px solid',
+              borderColor: 'success.main'
+            }}>
+              <Box display="flex" alignItems="center" gap={0.5} mb={0.5}>
+                <Savings color="success" fontSize="small" />
+                <Typography variant="subtitle2" color="success.dark" fontWeight="bold">
+                  Paga en USD y ahorra {cartPriceInfo.savings.percentage}%
+                </Typography>
+              </Box>
+              
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="body1" color="success.dark" fontWeight="bold">
+                  ${cartPriceInfo.priceUSD.toFixed(2)} USD
+                </Typography>
+                <Chip 
+                  label={`Ahorras ${cartPriceInfo.savings.amount.toFixed(2)} BS`}
+                  size="small"
+                  color="success"
+                  variant="filled"
+                />
+              </Box>
+              
+              <Typography variant="caption" color="success.dark" display="block">
+                Precio regular: {cartPriceInfo.savings.priceBSParallel.toFixed(2)} BS
+              </Typography>
+            </Box>
+
+            <Box display="flex" justifyContent="space-between" mb={2}>
+              <Typography variant="body2" color="textSecondary">
+                Envío:
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                Gratis
+              </Typography>
+            </Box>
+
+            <Divider sx={{ my: 1 }} />
+            
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">Total a pagar:</Typography>
+              <Box textAlign="right">
+                <Typography variant="h6" color="primary">
+                  {cartPriceInfo.priceBS.toFixed(2)} BS
+                </Typography>
+                <Typography variant="body2" color="success.main">
+                  (${cartPriceInfo.priceUSD.toFixed(2)} USD)
+                </Typography>
+              </Box>
             </Box>
 
             <Button 

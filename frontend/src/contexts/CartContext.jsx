@@ -19,16 +19,15 @@ export const CartProvider = ({ children }) => {
     lastUpdated: null
   });
 
-  // Cargar tasas de cambio al iniciar
   useEffect(() => {
     loadExchangeRates();
-    // Actualizar cada 5 minutos
     const interval = setInterval(loadExchangeRates, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
   const loadExchangeRates = async () => {
     try {
+      console.log('🔄 Cargando tasas de cambio...');
       const [officialRes, parallelRes] = await Promise.all([
         fetch('https://ve.dolarapi.com/v1/dolares/oficial'),
         fetch('https://ve.dolarapi.com/v1/dolares/paralelo')
@@ -37,19 +36,55 @@ export const CartProvider = ({ children }) => {
       const officialData = await officialRes.json();
       const parallelData = await parallelRes.json();
       
-      setExchangeRates({
+      const newRates = {
         official: officialData.promedio || 170,
         parallel: parallelData.promedio || 280,
         lastUpdated: new Date()
-      });
+      };
+      
+      console.log('💱 Tasas cargadas:', newRates);
+      setExchangeRates(newRates);
     } catch (error) {
-      console.error('Error cargando tasas de cambio:', error);
+      console.error('❌ Error cargando tasas de cambio:', error);
     }
+  };
+
+  // Calcular precios para diferentes métodos de pago
+  const calculatePriceInfo = (priceUSD) => {
+    const priceBSOfficial = priceUSD * exchangeRates.official;
+    const priceBSParallel = priceUSD * exchangeRates.parallel;
+    const savingsAmount = priceBSParallel - priceBSOfficial;
+    const savingsPercentage = ((savingsAmount / priceBSParallel) * 100).toFixed(1);
+    
+    return {
+      // Precio principal (en BS a tasa oficial)
+      priceBS: priceBSOfficial,
+      // Precio en USD (para métodos USD)
+      priceUSD: priceUSD,
+      // Información de ahorro (si paga en USD)
+      savings: {
+        amount: savingsAmount,
+        percentage: savingsPercentage,
+        priceBSParallel: priceBSParallel
+      },
+      // Tasas utilizadas
+      rates: {
+        official: exchangeRates.official,
+        parallel: exchangeRates.parallel
+      }
+    };
+  };
+
+  // Calcular precio para el carrito completo
+  const calculateCartPriceInfo = () => {
+    const totalUSD = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return calculatePriceInfo(totalUSD);
   };
 
   const addToCart = (product, customization = {}) => {
     const customId = `${product.id}-${Date.now()}`;
-    const finalPrice = calculateCustomPrice(product.basePrice, customization);
+    const finalPriceUSD = calculateCustomPrice(product.basePrice, customization);
+    const priceInfo = calculatePriceInfo(finalPriceUSD);
     
     // Construir URL correcta para la imagen
     let productImage = '/images/placeholder-bracelet.jpg';
@@ -75,8 +110,9 @@ export const CartProvider = ({ children }) => {
         notes: customization.notes || ''
       },
       quantity: 1,
-      price: finalPrice,
-      image: productImage
+      price: finalPriceUSD, // Precio en USD
+      image: productImage,
+      priceInfo: priceInfo
     };
     
     setCartItems(prev => [...prev, newItem]);
@@ -112,7 +148,11 @@ export const CartProvider = ({ children }) => {
       return;
     }
     setCartItems(prev => prev.map(item => 
-      item.id === itemId ? { ...item, quantity: newQuantity } : item
+      item.id === itemId ? { 
+        ...item, 
+        quantity: newQuantity,
+        priceInfo: calculatePriceInfo(item.price)
+      } : item
     ));
   };
 
@@ -120,34 +160,12 @@ export const CartProvider = ({ children }) => {
     setCartItems([]);
   };
 
-  const getCartTotal = () => {
+  const getCartTotalUSD = () => {
     return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
   const getCartCount = () => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
-  };
-
-  // Calcular precios en BS según método de pago
-  const calculatePriceInBolivares = (amountUSD, method) => {
-    if (method === 'PAGO_MOVIL' || method === 'CASH_BS') {
-      return amountUSD * exchangeRates.official;
-    }
-    return null; // Para métodos en USD
-  };
-
-  // Calcular ahorro al pagar en USD
-  const calculateSavings = (amountUSD) => {
-    const amountBSOfficial = amountUSD * exchangeRates.official;
-    const amountBSParallel = amountUSD * exchangeRates.parallel;
-    const savings = amountBSParallel - amountBSOfficial;
-    
-    return {
-      amountBSOfficial,
-      amountBSParallel,
-      savingsAmount: savings,
-      savingsPercentage: ((savings / amountBSParallel) * 100).toFixed(1)
-    };
   };
 
   const value = {
@@ -158,11 +176,12 @@ export const CartProvider = ({ children }) => {
     removeFromCart,
     updateQuantity,
     clearCart,
-    getCartTotal,
+    getCartTotalUSD,
     cartCount: getCartCount(),
     exchangeRates,
-    calculatePriceInBolivares,
-    calculateSavings
+    calculatePriceInfo,
+    calculateCartPriceInfo,
+    loadExchangeRates
   };
 
   return (

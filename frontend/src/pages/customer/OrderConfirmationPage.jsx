@@ -99,7 +99,6 @@ const OrderConfirmationPage = () => {
                   📦 Detalles de la Orden
                 </Typography>
                 <Divider sx={{ my: 2 }} />
-
                 <Box sx={{ mb: 2 }}>
                   <Typography>
                     <strong>Fecha:</strong>{" "}
@@ -121,7 +120,6 @@ const OrderConfirmationPage = () => {
                     />
                   </Typography>
                 </Box>
-
                 <Typography variant="subtitle1" gutterBottom>
                   📋 Resumen de Pago:
                 </Typography>
@@ -151,19 +149,24 @@ const OrderConfirmationPage = () => {
                     <strong>Tasa de cambio:</strong> {order.exchangeRate} BS/USD
                   </Typography>
                 )}
-
+                // En los detalles de pago
                 {order.paymentMethod &&
                   ["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(
                     order.paymentMethod
                   ) && (
-                    <Typography
-                      variant="body2"
-                      color="success.main"
-                      sx={{ mt: 1 }}
+                    <Box
+                      sx={{
+                        mt: 1,
+                        p: 1,
+                        bgcolor: "success.light",
+                        borderRadius: 1,
+                      }}
                     >
-                      ✅ Elegiste la opción más económica - Ahorraste pagando
-                      directamente en USD
-                    </Typography>
+                      <Typography variant="body2" color="success.dark">
+                        ✅ <strong>¡Excelente elección!</strong> Ahorraste
+                        pagando directamente en USD.
+                      </Typography>
+                    </Box>
                   )}
               </CardContent>
             </Card>
