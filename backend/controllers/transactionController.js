@@ -31,6 +31,7 @@ export const calculatePayment = async (req, res) => {
 };
 
 // Crear nueva transacción
+// Crear nueva transacción
 export const createTransaction = async (req, res) => {
   try {
     console.log("📦 Incoming transaction request");
@@ -85,59 +86,14 @@ export const createTransaction = async (req, res) => {
     if (["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(paymentMethod)) {
       discountPercentage = ((parallelRate - officialRate) / parallelRate) * 100;
       finalAmountUSD = totalUSD * (1 - discountPercentage / 100);
-
       console.log(`💰 Descuento aplicado: ${discountPercentage.toFixed(1)}%`);
-      console.log(
-        `💰 Precio original: $${totalUSD} → Precio final: $${finalAmountUSD}`
-      );
     }
 
-    // Preparar datos de la transacción
-    const transactionData = {
-      userId,
-      amountUSD: finalAmountUSD,
-      originalAmountUSD: totalUSD,
-      paymentMethod,
-      status: "PENDING",
-      discountPercentage: discountPercentage > 0 ? discountPercentage : null,
-    };
-
-    // Para métodos en BS, guardar la conversión
-    if (paymentMethod === "PAGO_MOVIL" || paymentMethod === "CASH_BS") {
-      transactionData.amountBS = totalUSD * officialRate;
-      transactionData.exchangeRate = officialRate;
-    }
-
-    // Para métodos que requieren referencia o información adicional
-    if (paymentMethod === "PAGO_MOVIL") {
-      if (!parsedPaymentDetails.reference || !parsedPaymentDetails.senderName) {
-        return res.status(400).json({
-          message: "Reference and sender name are required for Pago Móvil",
-        });
-      }
-      transactionData.reference = parsedPaymentDetails.reference;
-      transactionData.senderName = parsedPaymentDetails.senderName;
-      transactionData.senderPhone = parsedPaymentDetails.senderPhone || "";
-    } else {
-      // Para otros métodos, guardar el nombre y teléfono si están disponibles
-      transactionData.senderName = parsedPaymentDetails.senderName || "";
-      transactionData.senderPhone = parsedPaymentDetails.senderPhone || "";
-    }
-
-    // Manejar la imagen del comprobante si existe
-    if (req.file) {
-      transactionData.screenshot = `/uploads/${req.file.filename}`;
-      transactionData.status = "VERIFYING";
-    }
-
-    console.log("📊 Transaction data to create:", transactionData);
-
-    // Crear la transacción
+    // Preparar datos de la transacción para Prisma (SOLO CAMPOS QUE EXISTEN EN EL SCHEMA)
     const transactionDataForPrisma = {
       amountUSD: finalAmountUSD,
       paymentMethod: paymentMethod,
-      status: transactionData.status,
-    //   discountPercentage: transactionData.discountPercentage,
+      status: "PENDING",
     };
 
     // Solo agregar user si userId existe
@@ -147,28 +103,39 @@ export const createTransaction = async (req, res) => {
       };
     }
 
-    // Agregar campos condicionales
-    if (transactionData.amountBS) {
-      transactionDataForPrisma.amountBS = transactionData.amountBS;
+    // Para métodos en BS, guardar la conversión
+    if (paymentMethod === "PAGO_MOVIL" || paymentMethod === "CASH_BS") {
+      transactionDataForPrisma.amountBS = totalUSD * officialRate;
+      transactionDataForPrisma.exchangeRate = officialRate;
     }
-    if (transactionData.exchangeRate) {
-      transactionDataForPrisma.exchangeRate = transactionData.exchangeRate;
+
+    // Información del remitente
+    if (parsedPaymentDetails.senderName) {
+      transactionDataForPrisma.senderName = parsedPaymentDetails.senderName;
     }
-    if (transactionData.reference) {
-      transactionDataForPrisma.reference = transactionData.reference;
+    if (parsedPaymentDetails.senderPhone) {
+      transactionDataForPrisma.senderPhone = parsedPaymentDetails.senderPhone;
     }
-    if (transactionData.senderName) {
-      transactionDataForPrisma.senderName = transactionData.senderName;
+
+    // Para Pago Móvil
+    if (paymentMethod === "PAGO_MOVIL") {
+      if (!parsedPaymentDetails.reference) {
+        return res.status(400).json({
+          message: "Reference is required for Pago Móvil",
+        });
+      }
+      transactionDataForPrisma.reference = parsedPaymentDetails.reference;
     }
-    if (transactionData.senderPhone) {
-      transactionDataForPrisma.senderPhone = transactionData.senderPhone;
-    }
-    if (transactionData.screenshot) {
-      transactionDataForPrisma.screenshot = transactionData.screenshot;
+
+    // Manejar la imagen del comprobante
+    if (req.file) {
+      transactionDataForPrisma.screenshot = `/uploads/${req.file.filename}`;
+      transactionDataForPrisma.status = "VERIFYING";
     }
 
     console.log("📊 Transaction data for Prisma:", transactionDataForPrisma);
 
+    // Crear la transacción
     const transaction = await prisma.transaction.create({
       data: transactionDataForPrisma,
       include: {
@@ -185,6 +152,7 @@ export const createTransaction = async (req, res) => {
 
     console.log("✅ Transaction created:", transaction.id);
 
+    // Crear la orden asociada
     const orderData = {
       user: { connect: { id: userId } },
       transaction: { connect: { id: transaction.id } },
@@ -192,11 +160,11 @@ export const createTransaction = async (req, res) => {
       totalUSD: finalAmountUSD,
       paymentMethod: paymentMethod,
       paymentDetails: parsedPaymentDetails,
-      status: transactionData.status === "VERIFYING" ? "verifying" : "pending",
+      status: transactionDataForPrisma.status === "VERIFYING" ? "verifying" : "pending",
     };
 
-    if (transactionData.amountBS) {
-      orderData.totalBS = transactionData.amountBS;
+    if (transactionDataForPrisma.amountBS) {
+      orderData.totalBS = transactionDataForPrisma.amountBS;
     }
 
     const order = await prisma.order.create({
@@ -205,20 +173,13 @@ export const createTransaction = async (req, res) => {
 
     console.log("✅ Order created:", order.id);
 
-    // Generar instrucciones de pago
-    const instructions = generatePaymentInstructions(
-      paymentMethod,
-      transaction
-    );
-
     res.status(201).json({
       message: "Transaction created successfully",
       transaction: {
         ...transaction,
         orderId: order.id,
+        discountPercentage: discountPercentage > 0 ? discountPercentage : null, // Enviar en respuesta, no en BD
       },
-      instructions,
-      nextSteps: getNextSteps(paymentMethod),
     });
   } catch (error) {
     console.error("❌ Error creating transaction:", error);
@@ -228,7 +189,6 @@ export const createTransaction = async (req, res) => {
     });
   }
 };
-
 // Obtener transacciones del usuario
 export const getUserTransactions = async (req, res) => {
   try {

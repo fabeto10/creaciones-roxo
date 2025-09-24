@@ -141,24 +141,25 @@ enum TransactionStatus {
 }
 
 model Transaction {
-  id            Int               @id @default(autoincrement())
-  userId        Int?
-  user          User?             @relation(fields: [userId], references: [id])
-  amountUSD     Float
-  amountBS      Float?
-  exchangeRate  Float?            // Tasa usada para la conversión
-  paymentMethod PaymentMethod
-  status        TransactionStatus @default(PENDING)
-  reference     String?           // Referencia de pago (Pago Móvil)
-  senderName    String?           // Nombre del remitente
-  senderPhone   String?           // Teléfono del remitente
-  screenshot    String?           // URL del comprobante
-  adminNotes    String?           // Notas del administrador
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  verifiedAt    DateTime?         // Fecha de verificación
+  id               Int               @id @default(autoincrement())
+  userId           Int?
+  user             User?             @relation(fields: [userId], references: [id])
+  amountUSD        Float
+  amountBS         Float?
+  exchangeRate     Float?
+  paymentMethod    PaymentMethod
+  status           TransactionStatus @default(PENDING)
+  discountPercentage Float?           // ✅ AGREGAR ESTE CAMPO
+  reference        String?
+  senderName       String?
+  senderPhone      String?
+  screenshot       String?
+  adminNotes       String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  verifiedAt       DateTime?
   
-  orders        Order[]
+  orders           Order[]
   
   @@map("transactions")
 }
