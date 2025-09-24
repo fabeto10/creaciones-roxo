@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Container,
   Typography,
@@ -25,18 +25,10 @@ import {
   Grid,
   Card,
   CardContent,
-} from "@mui/material";
-import {
-  Add,
-  Edit,
-  Delete,
-  Visibility,
-  Inventory2,
-  CloudUpload,
-  Delete as DeleteIcon,
-} from "@mui/icons-material";
-import { productsAPI } from "../../services/products";
-import { charmsAPI } from "../../services/charms";
+} from '@mui/material';
+import { Add, Edit, Delete, Visibility, Inventory2, CloudUpload, Delete as DeleteIcon } from '@mui/icons-material';
+import { productsAPI } from '../../services/products';
+import { charmsAPI } from '../../services/charms';
 
 const ProductManagement = () => {
   const [products, setProducts] = useState([]);
@@ -49,16 +41,16 @@ const ProductManagement = () => {
   const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    type: "pulsera",
-    basePrice: "",
-    category: "",
+    name: '',
+    description: '',
+    type: 'pulsera',
+    basePrice: '',
+    category: '',
     customizable: false,
-    stock: "",
-    tags: "",
-    availableColors: "",
-    availableMaterials: "",
+    stock: '',
+    tags: '',
+    availableColors: '',
+    availableMaterials: ''
   });
 
   useEffect(() => {
@@ -67,16 +59,14 @@ const ProductManagement = () => {
 
   const loadData = async () => {
     try {
-      setLoading(true);
       const [productsResponse, charmsResponse] = await Promise.all([
         productsAPI.getProducts(),
-        charmsAPI.getCharms(),
+        charmsAPI.getCharms()
       ]);
       setProducts(productsResponse.data);
       setCharms(charmsResponse.data);
     } catch (error) {
-      console.error("Error loading data:", error);
-      alert("Error cargando datos: " + error.message);
+      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
@@ -93,27 +83,35 @@ const ProductManagement = () => {
         category: product.category,
         customizable: product.customizable,
         stock: product.stock,
-        tags: JSON.stringify(product.tags || []),
-        availableColors: JSON.stringify(product.availableColors || []),
-        availableMaterials: JSON.stringify(product.availableMaterials || []),
+        tags: product.tags ? JSON.stringify(product.tags) : '',
+        availableColors: product.availableColors ? JSON.stringify(product.availableColors) : '',
+        availableMaterials: product.availableMaterials ? JSON.stringify(product.availableMaterials) : ''
       });
+
+      // Cargar imágenes existentes
+      if (product.images && product.images.length > 0) {
+        const existingImageUrls = product.images.map(img => `http://localhost:5000${img}`);
+        setImagePreviews(existingImageUrls);
+      } else {
+        setImagePreviews([]);
+      }
     } else {
       setEditingProduct(null);
       setFormData({
-        name: "",
-        description: "",
-        type: "pulsera",
-        basePrice: "",
-        category: "",
+        name: '',
+        description: '',
+        type: 'pulsera',
+        basePrice: '',
+        category: '',
         customizable: false,
-        stock: "",
-        tags: "",
-        availableColors: "",
-        availableMaterials: "",
+        stock: '',
+        tags: '',
+        availableColors: '',
+        availableMaterials: ''
       });
+      setImagePreviews([]);
     }
     setSelectedImages([]);
-    setImagePreviews([]);
     setDialogOpen(true);
   };
 
@@ -124,23 +122,32 @@ const ProductManagement = () => {
     setImagePreviews([]);
   };
 
-  // Manejar selección de imágenes
   const handleImageSelect = (event) => {
     const files = Array.from(event.target.files);
     setSelectedImages(files);
-
+    
     // Crear previews de imágenes
-    const previews = files.map((file) => URL.createObjectURL(file));
-    setImagePreviews(previews);
+    const previews = files.map(file => URL.createObjectURL(file));
+    setImagePreviews(prev => [...prev, ...previews]);
   };
 
   const handleRemoveImage = (index) => {
     const newImages = [...selectedImages];
     const newPreviews = [...imagePreviews];
-
-    newImages.splice(index, 1);
-    newPreviews.splice(index, 1);
-
+    
+    // Determinar si es una imagen existente o nueva
+    const existingImagesCount = imagePreviews.length - selectedImages.length;
+    
+    if (index < existingImagesCount) {
+      // Es una imagen existente - solo la removemos de la preview
+      newPreviews.splice(index, 1);
+    } else {
+      // Es una imagen nueva - la removemos de ambos arrays
+      const newIndex = index - existingImagesCount;
+      newImages.splice(newIndex, 1);
+      newPreviews.splice(index, 1);
+    }
+    
     setSelectedImages(newImages);
     setImagePreviews(newPreviews);
   };
@@ -149,18 +156,22 @@ const ProductManagement = () => {
     e.preventDefault();
     try {
       const submitData = new FormData();
-
-      // Agregar campos del formulario CORREGIDO
-      Object.keys(formData).forEach((key) => {
-        if (formData[key] !== null && formData[key] !== undefined) {
-          if (
-            key === "tags" ||
-            key === "availableColors" ||
-            key === "availableMaterials"
-          ) {
-            // Para campos JSON, parsear solo si no está vacío
-            const value = formData[key] ? JSON.parse(formData[key]) : [];
-            submitData.append(key, JSON.stringify(value));
+      
+      // Agregar campos del formulario
+      Object.keys(formData).forEach(key => {
+        if (formData[key] !== '' && formData[key] !== null) {
+          if (key === 'tags' || key === 'availableColors' || key === 'availableMaterials') {
+            try {
+              const value = formData[key] ? JSON.parse(formData[key]) : [];
+              submitData.append(key, JSON.stringify(value));
+            } catch (error) {
+              console.error(`Error parsing ${key}:`, error);
+              submitData.append(key, JSON.stringify([]));
+            }
+          } else if (key === 'basePrice' || key === 'stock') {
+            submitData.append(key, parseFloat(formData[key]) || 0);
+          } else if (key === 'customizable') {
+            submitData.append(key, formData[key] === 'true' || formData[key] === true);
           } else {
             submitData.append(key, formData[key]);
           }
@@ -168,11 +179,11 @@ const ProductManagement = () => {
       });
 
       // Agregar imágenes seleccionadas
-      selectedImages.forEach((image) => {
-        submitData.append("images", image);
+      selectedImages.forEach(image => {
+        submitData.append('images', image);
       });
 
-      console.log("Enviando datos...", Object.fromEntries(submitData));
+      console.log('Enviando datos del producto...');
 
       if (editingProduct) {
         await productsAPI.updateProduct(editingProduct.id, submitData);
@@ -183,20 +194,18 @@ const ProductManagement = () => {
       handleCloseDialog();
       loadData();
     } catch (error) {
-      console.error("Error saving product:", error);
-      alert("Error al guardar producto: " + error.message);
+      console.error('Error saving product:', error);
+      alert('Error guardando producto: ' + error.message);
     }
   };
 
   const handleDelete = async (productId) => {
-    if (
-      window.confirm("¿Estás seguro de que quieres eliminar este producto?")
-    ) {
+    if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
       try {
         await productsAPI.updateProduct(productId, { isActive: false });
         loadData();
       } catch (error) {
-        console.error("Error deleting product:", error);
+        console.error('Error deleting product:', error);
       }
     }
   };
@@ -213,15 +222,9 @@ const ProductManagement = () => {
     <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
       {/* Header */}
       <Paper elevation={2} sx={{ p: 4, mb: 4, borderRadius: 3 }}>
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          flexWrap="wrap"
-          gap={2}
-        >
+        <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
           <Box display="flex" alignItems="center" gap={2}>
-            <Inventory2 sx={{ fontSize: 40, color: "primary.main" }} />
+            <Inventory2 sx={{ fontSize: 40, color: 'primary.main' }} />
             <Box>
               <Typography variant="h4" component="h1">
                 Gestión de Productos
@@ -231,11 +234,7 @@ const ProductManagement = () => {
               </Typography>
             </Box>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => handleOpenDialog()}
-          >
+          <Button variant="contained" startIcon={<Add />} onClick={() => handleOpenDialog()}>
             Nuevo Producto
           </Button>
         </Box>
@@ -249,7 +248,9 @@ const ProductManagement = () => {
               <Typography color="textSecondary" gutterBottom>
                 Total Productos
               </Typography>
-              <Typography variant="h4">{products.length}</Typography>
+              <Typography variant="h4">
+                {products.length}
+              </Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -260,7 +261,7 @@ const ProductManagement = () => {
                 Productos Activos
               </Typography>
               <Typography variant="h4">
-                {products.filter((p) => p.isActive).length}
+                {products.filter(p => p.isActive).length}
               </Typography>
             </CardContent>
           </Card>
@@ -271,7 +272,9 @@ const ProductManagement = () => {
               <Typography color="textSecondary" gutterBottom>
                 Total Dijes
               </Typography>
-              <Typography variant="h4">{charms.length}</Typography>
+              <Typography variant="h4">
+                {charms.length}
+              </Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -282,7 +285,7 @@ const ProductManagement = () => {
                 Personalizables
               </Typography>
               <Typography variant="h4">
-                {products.filter((p) => p.customizable).length}
+                {products.filter(p => p.customizable).length}
               </Typography>
             </CardContent>
           </Card>
@@ -309,7 +312,7 @@ const ProductManagement = () => {
                 <TableCell>
                   <Typography fontWeight="bold">{product.name}</Typography>
                   <Typography variant="body2" color="textSecondary">
-                    {product.description.substring(0, 50)}...
+                    {product.description?.substring(0, 50)}...
                   </Typography>
                 </TableCell>
                 <TableCell>
@@ -319,10 +322,10 @@ const ProductManagement = () => {
                 <TableCell>${product.basePrice}</TableCell>
                 <TableCell>{product.stock}</TableCell>
                 <TableCell>
-                  <Chip
-                    label={product.isActive ? "Activo" : "Inactivo"}
-                    color={product.isActive ? "success" : "default"}
-                    size="small"
+                  <Chip 
+                    label={product.isActive ? 'Activo' : 'Inactivo'} 
+                    color={product.isActive ? 'success' : 'default'} 
+                    size="small" 
                   />
                 </TableCell>
                 <TableCell>
@@ -330,15 +333,15 @@ const ProductManagement = () => {
                     <IconButton size="small" color="info">
                       <Visibility />
                     </IconButton>
-                    <IconButton
-                      size="small"
+                    <IconButton 
+                      size="small" 
                       color="primary"
                       onClick={() => handleOpenDialog(product)}
                     >
                       <Edit />
                     </IconButton>
-                    <IconButton
-                      size="small"
+                    <IconButton 
+                      size="small" 
                       color="error"
                       onClick={() => handleDelete(product.id)}
                     >
@@ -353,37 +356,25 @@ const ProductManagement = () => {
       </TableContainer>
 
       {/* Diálogo para crear/editar producto */}
-      <Dialog
-        open={dialogOpen}
-        onClose={handleCloseDialog}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>
-          {editingProduct ? "Editar Producto" : "Nuevo Producto"}
+          {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
         </DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
             <Grid container spacing={2}>
-              {/* Sección de subida de imágenes */}
+              {/* Sección de imágenes */}
               <Grid item xs={12}>
                 <Typography variant="h6" gutterBottom>
                   Imágenes del Producto
                 </Typography>
-                <Box
-                  sx={{
-                    border: "2px dashed #e91e63",
-                    borderRadius: 2,
-                    p: 2,
-                    textAlign: "center",
-                  }}
-                >
+                <Box sx={{ border: '2px dashed #e91e63', borderRadius: 2, p: 2, textAlign: 'center' }}>
                   <input
                     type="file"
                     accept="image/*"
                     multiple
                     onChange={handleImageSelect}
-                    style={{ display: "none" }}
+                    style={{ display: 'none' }}
                     ref={fileInputRef}
                   />
                   <Button
@@ -393,11 +384,7 @@ const ProductManagement = () => {
                   >
                     Seleccionar Imágenes
                   </Button>
-                  <Typography
-                    variant="body2"
-                    color="textSecondary"
-                    sx={{ mt: 1 }}
-                  >
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
                     Puedes seleccionar múltiples imágenes (máximo 5)
                   </Typography>
                 </Box>
@@ -406,38 +393,54 @@ const ProductManagement = () => {
                 {imagePreviews.length > 0 && (
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="body2" gutterBottom>
-                      Vista previa ({imagePreviews.length} imágenes
-                      seleccionadas)
+                      Vista previa ({imagePreviews.length} imágenes)
                     </Typography>
-                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                      {imagePreviews.map((preview, index) => (
-                        <Box key={index} sx={{ position: "relative" }}>
-                          <img
-                            src={preview}
-                            alt={`Preview ${index}`}
-                            style={{
-                              width: 80,
-                              height: 80,
-                              objectFit: "cover",
-                              borderRadius: 8,
-                            }}
-                          />
-                          <IconButton
-                            size="small"
-                            sx={{
-                              position: "absolute",
-                              top: -8,
-                              right: -8,
-                              bgcolor: "error.main",
-                              color: "white",
-                              "&:hover": { bgcolor: "error.dark" },
-                            }}
-                            onClick={() => handleRemoveImage(index)}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      ))}
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {imagePreviews.map((preview, index) => {
+                        const isExisting = index < (imagePreviews.length - selectedImages.length);
+                        return (
+                          <Box key={index} sx={{ position: 'relative' }}>
+                            <img
+                              src={preview}
+                              alt={`Preview ${index}`}
+                              style={{ 
+                                width: 80, 
+                                height: 80, 
+                                objectFit: 'cover', 
+                                borderRadius: 8 
+                              }}
+                            />
+                            <IconButton
+                              size="small"
+                              sx={{ 
+                                position: 'absolute', 
+                                top: -8, 
+                                right: -8, 
+                                bgcolor: 'error.main',
+                                color: 'white',
+                                '&:hover': { bgcolor: 'error.dark' }
+                              }}
+                              onClick={() => handleRemoveImage(index)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                            {isExisting && (
+                              <Chip 
+                                label="Existente" 
+                                size="small" 
+                                sx={{ 
+                                  position: 'absolute', 
+                                  bottom: 4, 
+                                  left: 4,
+                                  bgcolor: 'primary.main',
+                                  color: 'white',
+                                  fontSize: '0.6rem'
+                                }}
+                              />
+                            )}
+                          </Box>
+                        );
+                      })}
                     </Box>
                   </Box>
                 )}
@@ -448,9 +451,7 @@ const ProductManagement = () => {
                   fullWidth
                   label="Nombre del producto"
                   value={formData.name}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, name: e.target.value }))
-                  }
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   required
                 />
               </Grid>
@@ -460,9 +461,7 @@ const ProductManagement = () => {
                   <Select
                     value={formData.type}
                     label="Tipo"
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, type: e.target.value }))
-                    }
+                    onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
                   >
                     <MenuItem value="pulsera">Pulsera</MenuItem>
                     <MenuItem value="dije">Dije</MenuItem>
@@ -478,12 +477,7 @@ const ProductManagement = () => {
                   rows={3}
                   label="Descripción"
                   value={formData.description}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   required
                 />
               </Grid>
@@ -493,13 +487,8 @@ const ProductManagement = () => {
                   type="number"
                   label="Precio base"
                   value={formData.basePrice}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      basePrice: parseFloat(e.target.value) || 0,
-                    }))
-                  }
-                  inputProps={{ min: 0, step: "0.01" }}
+                  onChange={(e) => setFormData(prev => ({ ...prev, basePrice: e.target.value }))}
+                  inputProps={{ step: "0.01", min: "0" }}
                   required
                 />
               </Grid>
@@ -509,27 +498,30 @@ const ProductManagement = () => {
                   type="number"
                   label="Stock"
                   value={formData.stock}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      stock: parseInt(e.target.value) || 0,
-                    }))
-                  }
-                  inputProps={{ min: 0 }}
+                  onChange={(e) => setFormData(prev => ({ ...prev, stock: e.target.value }))}
+                  inputProps={{ min: "0" }}
                   required
                 />
               </Grid>
               <Grid item xs={12} sm={4}>
+                <FormControl fullWidth>
+                  <InputLabel>Personalizable</InputLabel>
+                  <Select
+                    value={formData.customizable}
+                    label="Personalizable"
+                    onChange={(e) => setFormData(prev => ({ ...prev, customizable: e.target.value }))}
+                  >
+                    <MenuItem value={false}>No</MenuItem>
+                    <MenuItem value={true}>Sí</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Categoría"
                   value={formData.category}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      category: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
                   required
                 />
               </Grid>
@@ -538,9 +530,7 @@ const ProductManagement = () => {
                   fullWidth
                   label="Etiquetas (JSON array)"
                   value={formData.tags}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, tags: e.target.value }))
-                  }
+                  onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
                   placeholder='["popular", "nuevo"]'
                   helperText="Ingresa las etiquetas como array JSON"
                 />
@@ -550,12 +540,7 @@ const ProductManagement = () => {
                   fullWidth
                   label="Colores disponibles (JSON array)"
                   value={formData.availableColors}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      availableColors: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setFormData(prev => ({ ...prev, availableColors: e.target.value }))}
                   placeholder='["rojo", "azul", "verde"]'
                   helperText="Ingresa los colores como array JSON"
                 />
@@ -565,12 +550,7 @@ const ProductManagement = () => {
                   fullWidth
                   label="Materiales disponibles (JSON array)"
                   value={formData.availableMaterials}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      availableMaterials: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setFormData(prev => ({ ...prev, availableMaterials: e.target.value }))}
                   placeholder='[{"name": "cuero", "priceAdjustment": 0}]'
                   helperText="Ingresa los materiales como array JSON de objetos"
                 />
@@ -580,7 +560,7 @@ const ProductManagement = () => {
           <DialogActions>
             <Button onClick={handleCloseDialog}>Cancelar</Button>
             <Button type="submit" variant="contained">
-              {editingProduct ? "Actualizar" : "Crear"}
+              {editingProduct ? 'Actualizar' : 'Crear'}
             </Button>
           </DialogActions>
         </form>

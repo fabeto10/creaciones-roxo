@@ -12,12 +12,12 @@ import {
   Chip,
   Pagination,
   Drawer,
-  Button
+  Button,
+  CircularProgress
 } from '@mui/material';
 import { FilterList, Search, Tune } from '@mui/icons-material';
 import { productsAPI } from '../../services/products';
 import ProductCard from '../../components/products/ProductCard';
-import { useCart } from '../../contexts/CartContext';
 
 const StorePage = () => {
   const [products, setProducts] = useState([]);
@@ -30,14 +30,13 @@ const StorePage = () => {
   const [filterOpen, setFilterOpen] = useState(false);
   const productsPerPage = 9;
 
-  const { addToCart } = useCart();
-
   useEffect(() => {
     loadProducts();
   }, []);
 
   const loadProducts = async () => {
     try {
+      setLoading(true);
       const response = await productsAPI.getProducts();
       setProducts(response.data.filter(p => p.isActive));
     } catch (error) {
@@ -48,7 +47,7 @@ const StorePage = () => {
   };
 
   const categories = useMemo(() => 
-    [...new Set(products.map(product => product.category))], 
+    [...new Set(products.map(product => product.category).filter(Boolean))], 
     [products]
   );
 
@@ -58,8 +57,8 @@ const StorePage = () => {
     // Filtro por búsqueda
     if (searchTerm) {
       filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
@@ -86,7 +85,7 @@ const StorePage = () => {
           return b.basePrice - a.basePrice;
         case 'name':
         default:
-          return a.name.localeCompare(b.name);
+          return a.name?.localeCompare(b.name);
       }
     });
 
@@ -101,8 +100,8 @@ const StorePage = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Typography>Cargando productos...</Typography>
+      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <CircularProgress />
       </Container>
     );
   }
@@ -185,20 +184,8 @@ const StorePage = () => {
         </Box>
       </Box>
 
-      {/* Drawer de filtros para móvil */}
-      <Drawer
-        anchor="right"
-        open={filterOpen}
-        onClose={() => setFilterOpen(false)}
-      >
-        <Box sx={{ p: 2, width: 300 }}>
-          <Typography variant="h6" gutterBottom>Filtros</Typography>
-          {/* Aquí van los mismos filtros pero en vertical */}
-        </Box>
-      </Drawer>
-
       {/* Información de resultados */}
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
         <Typography variant="body2" color="textSecondary">
           {filteredProducts.length} productos encontrados
         </Typography>
@@ -216,6 +203,17 @@ const StorePage = () => {
               onDelete={() => setPriceRange('')}
               size="small"
             />
+          )}
+          {(categoryFilter || priceRange) && (
+            <Button 
+              size="small" 
+              onClick={() => {
+                setCategoryFilter('');
+                setPriceRange('');
+              }}
+            >
+              Limpiar
+            </Button>
           )}
         </Box>
       </Box>

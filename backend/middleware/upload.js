@@ -5,15 +5,15 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Asegurarse de que la carpeta uploads existe
+// Asegurarse de que las carpetas uploads existen
 import fs from 'fs';
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Configurar multer para almacenamiento
-const storage = multer.diskStorage({
+// Configuración para productos
+const productStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadsDir);
   },
@@ -23,7 +23,18 @@ const storage = multer.diskStorage({
   }
 });
 
-// Filtrar por tipo de archivo
+// Configuración para screenshots
+const screenshotStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'screenshot-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+// Filtro de archivos
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
@@ -32,12 +43,22 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({
-  storage: storage,
+// Upload para productos (múltiples archivos)
+export const productUpload = multer({
+  storage: productStorage,
   fileFilter: fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB máximo
   }
 });
 
-export default upload;
+// Upload para screenshots (único archivo)
+export const screenshotUpload = multer({
+  storage: screenshotStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB máximo
+  }
+});
+
+export default productUpload;

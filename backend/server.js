@@ -9,6 +9,7 @@ import productRoutes from './routes/products.js';
 import designRoutes from './routes/designs.js';
 import charmRoutes from './routes/charms.js';
 import adminSetup from './routes/adminSetup.js';
+import transactionRoutes from './routes/transactions.js';
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/designs', designRoutes);
 app.use('/api/charms', charmRoutes);
+app.use('/api/transactions', transactionRoutes); 
 
 // Ruta de prueba
 app.get('/api', (req, res) => {

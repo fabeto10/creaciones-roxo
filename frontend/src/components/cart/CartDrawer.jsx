@@ -80,25 +80,49 @@ const CartDrawer = () => {
             {cartItems.map((item) => (
               <ListItem key={item.id} divider sx={{ py: 2 }}>
                 <Box sx={{ width: '100%' }}>
-                  <Box display="flex" justifyContent="space-between" alignItems="start" mb={1}>
-                    <ListItemText
-                      primary={item.product.name}
-                      secondary={
-                        <Box>
-                          <Typography variant="body2">
-                            Material: {item.customization.material}
+                  <Box display="flex" alignItems="flex-start" mb={1}>
+                    <Box sx={{ mr: 2, minWidth: 60 }}>
+                      <img 
+                        src={item.image} 
+                        alt={item.product.name}
+                        style={{ 
+                          width: 60, 
+                          height: 60, 
+                          objectFit: 'cover',
+                          borderRadius: 8
+                        }}
+                      />
+                    </Box>
+                    
+                    <Box sx={{ flexGrow: 1 }}>
+                      <ListItemText
+                        primary={
+                          <Typography variant="subtitle1" component="div">
+                            {item.product.name}
                           </Typography>
-                          <Typography variant="body2">
-                            Color: {item.customization.color}
-                          </Typography>
-                          {item.customization.charms.length > 0 && (
-                            <Typography variant="body2">
-                              Dijes: {item.customization.charms.length}
+                        }
+                        secondary={
+                          <Box component="div">
+                            <Typography variant="body2" component="span">
+                              Material: {item.customization.material}
                             </Typography>
-                          )}
-                        </Box>
-                      }
-                    />
+                            <br />
+                            <Typography variant="body2" component="span">
+                              Color: {item.customization.color}
+                            </Typography>
+                            {item.customization.charms.length > 0 && (
+                              <>
+                                <br />
+                                <Typography variant="body2" component="span">
+                                  Dijes: {item.customization.charms.length}
+                                </Typography>
+                              </>
+                            )}
+                          </Box>
+                        }
+                      />
+                    </Box>
+                    
                     <ListItemSecondaryAction>
                       <IconButton 
                         size="small" 

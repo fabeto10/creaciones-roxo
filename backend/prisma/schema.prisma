@@ -21,11 +21,13 @@ model User {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  transactions Transaction[]
 
   designs Design[]
   orders  Order[]
 
   @@map("users")
+
 }
 
 model Charm {
@@ -104,17 +106,59 @@ model Product {
 }
 
 model Order {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  items     Json     // Array de items del carrito como JSON
-  total     Float
-  status    String   @default("pending")
-  paymentMethod String
+  id            Int         @id @default(autoincrement())
+  transactionId Int?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  userId        Int
+  user          User        @relation(fields: [userId], references: [id])
+  items         Json        // Array de items del carrito como JSON
+  totalUSD      Float       // Total en dólares
+  totalBS       Float?      // Total en bolívares (si aplica)
+  status        String      @default("pending")
+  paymentMethod String?
   paymentDetails Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   @@map("orders")
+}
+
+
+enum PaymentMethod {
+  ZELLE
+  PAGO_MOVIL
+  CRYPTO
+  CASH_USD
+  CASH_BS
+  ZINLI
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  VERIFYING
+}
+
+model Transaction {
+  id            Int               @id @default(autoincrement())
+  userId        Int?
+  user          User?             @relation(fields: [userId], references: [id])
+  amountUSD     Float
+  amountBS      Float?
+  exchangeRate  Float?            // Tasa usada para la conversión
+  paymentMethod PaymentMethod
+  status        TransactionStatus @default(PENDING)
+  reference     String?           // Referencia de pago (Pago Móvil)
+  senderName    String?           // Nombre del remitente
+  senderPhone   String?           // Teléfono del remitente
+  screenshot    String?           // URL del comprobante
+  adminNotes    String?           // Notas del administrador
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  verifiedAt    DateTime?         // Fecha de verificación
+  
+  orders        Order[]
+  
+  @@map("transactions")
 }

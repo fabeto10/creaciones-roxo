@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Container,
   Typography,
@@ -7,50 +7,50 @@ import {
   Card,
   CardContent,
   Button,
-  Paper
-} from '@mui/material';
+  Paper,
+} from "@mui/material";
 import {
   Dashboard as DashboardIcon,
   Inventory2,
   People,
   Payment,
   DesignServices,
-  Add
-} from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+  Add,
+} from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
 
   const adminCards = [
     {
-      title: 'Gestión de Productos',
-      description: 'Administra dijes, materiales y colores',
+      title: "Gestión de Productos",
+      description: "Administra dijes, materiales y colores",
       icon: <Inventory2 sx={{ fontSize: 40 }} />,
-      path: '/admin/products',
-      color: '#e91e63'
+      path: "/admin/products",
+      color: "#e91e63",
     },
     {
-      title: 'Diseños Realizados',
-      description: 'Gestiona los diseños creados',
+      title: "Diseños Realizados",
+      description: "Gestiona los diseños creados",
       icon: <DesignServices sx={{ fontSize: 40 }} />,
-      path: '/admin/designs',
-      color: '#9c27b0'
+      path: "/admin/designs",
+      color: "#9c27b0",
     },
     {
-      title: 'Gestión de Clientes',
-      description: 'Administra usuarios y clientes',
+      title: "Gestión de Clientes",
+      description: "Administra usuarios y clientes",
       icon: <People sx={{ fontSize: 40 }} />,
-      path: '/admin/customers',
-      color: '#2196f3'
+      path: "/admin/customers",
+      color: "#2196f3",
     },
     {
-      title: 'Gestión de Pagos',
-      description: 'Controla pagos y transacciones',
+      title: "Gestión de Pagos",
+      description: "Administra transacciones y pagos",
       icon: <Payment sx={{ fontSize: 40 }} />,
-      path: '/admin/payments',
-      color: '#4caf50'
-    }
+      path: "/admin/payments",
+      color: "#4caf50",
+    },
   ];
 
   return (
@@ -59,8 +59,13 @@ const AdminDashboard = () => {
       <Paper elevation={2} sx={{ p: 4, mb: 4, borderRadius: 3 }}>
         <Box display="flex" alignItems="center" justifyContent="space-between">
           <Box>
-            <Typography variant="h4" component="h1" gutterBottom className="roxo-text-gradient">
-              <DashboardIcon sx={{ mr: 2, verticalAlign: 'bottom' }} />
+            <Typography
+              variant="h4"
+              component="h1"
+              gutterBottom
+              className="roxo-text-gradient"
+            >
+              <DashboardIcon sx={{ mr: 2, verticalAlign: "bottom" }} />
               Panel de Administración
             </Typography>
             <Typography variant="body1" color="textSecondary">
@@ -77,22 +82,20 @@ const AdminDashboard = () => {
       <Grid container spacing={4}>
         {adminCards.map((card, index) => (
           <Grid item xs={12} sm={6} md={3} key={index}>
-            <Card 
+            <Card
               elevation={3}
-              sx={{ 
-                cursor: 'pointer',
-                transition: 'transform 0.2s',
-                '&:hover': {
-                  transform: 'translateY(-4px)'
+              sx={{
+                cursor: "pointer",
+                transition: "transform 0.2s",
+                "&:hover": {
+                  transform: "translateY(-4px)",
                 },
-                borderRadius: 3
+                borderRadius: 3,
               }}
               onClick={() => navigate(card.path)}
             >
-              <CardContent sx={{ textAlign: 'center', p: 3 }}>
-                <Box sx={{ color: card.color, mb: 2 }}>
-                  {card.icon}
-                </Box>
+              <CardContent sx={{ textAlign: "center", p: 3 }}>
+                <Box sx={{ color: card.color, mb: 2 }}>{card.icon}</Box>
                 <Typography variant="h6" component="h3" gutterBottom>
                   {card.title}
                 </Typography>
