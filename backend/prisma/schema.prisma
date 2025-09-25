@@ -105,20 +105,24 @@ model Product {
   @@map("products")
 }
 
+// Mejorar el modelo Order para tener items detallados
 model Order {
-  id            Int         @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   transactionId Int?
   transaction   Transaction? @relation(fields: [transactionId], references: [id])
   userId        Int
-  user          User        @relation(fields: [userId], references: [id])
-  items         Json        // Array de items del carrito como JSON
-  totalUSD      Float       // Total en dólares
-  totalBS       Float?      // Total en bolívares (si aplica)
-  status        String      @default("pending")
+  user          User      @relation(fields: [userId], references: [id])
+  
+  // CAMBIAR items para que sea más estructurado
+  items         Json      // Debe contener: [{"productId": 1, "quantity": 2, "price": 25.99, "productName": "Pulsera", "productImages": ["/uploads/image1.png"]}]
+  
+  totalUSD      Float     
+  totalBS       Float?    
+  status        String    @default("pending")
   paymentMethod String?
   paymentDetails Json?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@map("orders")
 }
@@ -162,4 +166,23 @@ model Transaction {
   orders           Order[]
   
   @@map("transactions")
+}
+
+model ExternalProductRequest {
+  id          Int      @id @default(autoincrement())
+  productName String
+  description String?
+  customerName String
+  customerPhone String
+  customerEmail String?
+  customerContact String // WhatsApp, Instagram, etc.
+  status      String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+  budget      Float?
+  dueDate     DateTime?
+  notes       String?
+  images      Json?    // Array de URLs de imágenes
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("external_product_requests")
 }

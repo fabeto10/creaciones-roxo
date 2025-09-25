@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Container,
   Typography,
@@ -27,20 +27,20 @@ import {
   FormControl,
   InputLabel,
   Tab,
-  Tabs
-} from '@mui/material';
-import { 
-  Payment, 
-  Check, 
-  Close, 
-  Visibility, 
-  Refresh, 
+  Tabs,
+} from "@mui/material";
+import {
+  Payment,
+  Check,
+  Close,
+  Visibility,
+  Refresh,
   Upload,
   Edit,
   TrendingUp,
   AttachMoney,
-  People
-} from '@mui/icons-material';
+  People,
+} from "@mui/icons-material";
 
 const PaymentManagement = () => {
   const [transactions, setTransactions] = useState([]);
@@ -48,8 +48,8 @@ const PaymentManagement = () => {
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-  const [status, setStatus] = useState('');
-  const [adminNotes, setAdminNotes] = useState('');
+  const [status, setStatus] = useState("");
+  const [adminNotes, setAdminNotes] = useState("");
   const [tabValue, setTabValue] = useState(0);
   const [stats, setStats] = useState({
     total: 0,
@@ -57,7 +57,7 @@ const PaymentManagement = () => {
     completed: 0,
     cancelled: 0,
     verifying: 0,
-    totalAmount: 0
+    totalAmount: 0,
   });
 
   useEffect(() => {
@@ -66,21 +66,21 @@ const PaymentManagement = () => {
 
   const loadTransactions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/transactions', {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:5000/api/transactions", {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
-      
-      if (!response.ok) throw new Error('Error loading transactions');
-      
+
+      if (!response.ok) throw new Error("Error loading transactions");
+
       const data = await response.json();
       setTransactions(data.transactions || []);
       calculateStats(data.transactions || []);
     } catch (error) {
-      console.error('Error loading transactions:', error);
-      alert('Error cargando transacciones: ' + error.message);
+      console.error("Error loading transactions:", error);
+      alert("Error cargando transacciones: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -89,13 +89,13 @@ const PaymentManagement = () => {
   const calculateStats = (transactions) => {
     const stats = {
       total: transactions.length,
-      pending: transactions.filter(t => t.status === 'PENDING').length,
-      completed: transactions.filter(t => t.status === 'COMPLETED').length,
-      cancelled: transactions.filter(t => t.status === 'CANCELLED').length,
-      verifying: transactions.filter(t => t.status === 'VERIFYING').length,
+      pending: transactions.filter((t) => t.status === "PENDING").length,
+      completed: transactions.filter((t) => t.status === "COMPLETED").length,
+      cancelled: transactions.filter((t) => t.status === "CANCELLED").length,
+      verifying: transactions.filter((t) => t.status === "VERIFYING").length,
       totalAmount: transactions
-        .filter(t => t.status === 'COMPLETED')
-        .reduce((sum, t) => sum + t.amountUSD, 0)
+        .filter((t) => t.status === "COMPLETED")
+        .reduce((sum, t) => sum + t.amountUSD, 0),
     };
     setStats(stats);
   };
@@ -108,72 +108,85 @@ const PaymentManagement = () => {
   const handleUpdateStatus = (transaction) => {
     setSelectedTransaction(transaction);
     setStatus(transaction.status);
-    setAdminNotes(transaction.adminNotes || '');
+    setAdminNotes(transaction.adminNotes || "");
     setStatusDialogOpen(true);
   };
 
   const submitStatusUpdate = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/transactions/${selectedTransaction.id}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status, adminNotes })
-      });
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://localhost:5000/api/transactions/${selectedTransaction.id}/status`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status, adminNotes }),
+        }
+      );
 
       if (response.ok) {
         await loadTransactions();
         setStatusDialogOpen(false);
         setSelectedTransaction(null);
-        alert('Estado actualizado exitosamente');
+        alert("Estado actualizado exitosamente");
       } else {
-        throw new Error('Error updating status');
+        throw new Error("Error updating status");
       }
     } catch (error) {
-      console.error('Error updating transaction status:', error);
-      alert('Error actualizando estado: ' + error.message);
+      console.error("Error updating transaction status:", error);
+      alert("Error actualizando estado: " + error.message);
     }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'COMPLETED': return 'success';
-      case 'PENDING': return 'warning';
-      case 'VERIFYING': return 'info';
-      case 'CANCELLED': return 'error';
-      default: return 'default';
+      case "COMPLETED":
+        return "success";
+      case "PENDING":
+        return "warning";
+      case "VERIFYING":
+        return "info";
+      case "CANCELLED":
+        return "error";
+      default:
+        return "default";
     }
   };
 
   const getPaymentMethodColor = (method) => {
     const colors = {
-      ZELLE: 'primary',
-      PAGO_MOVIL: 'secondary',
-      CRYPTO: 'warning',
-      CASH_USD: 'success',
-      CASH_BS: 'info',
-      ZINLI: 'error'
+      ZELLE: "primary",
+      PAGO_MOVIL: "secondary",
+      CRYPTO: "warning",
+      CASH_USD: "success",
+      CASH_BS: "info",
+      ZINLI: "error",
     };
-    return colors[method] || 'default';
+    return colors[method] || "default";
   };
 
-  const formatCurrency = (amount, currency = 'USD') => {
-    return new Intl.NumberFormat('es-VE', {
-      style: 'currency',
-      currency: currency === 'USD' ? 'USD' : 'VES'
+  const formatCurrency = (amount, currency = "USD") => {
+    return new Intl.NumberFormat("es-VE", {
+      style: "currency",
+      currency: currency === "USD" ? "USD" : "VES",
     }).format(amount);
   };
 
-  const filteredTransactions = transactions.filter(transaction => {
+  const filteredTransactions = transactions.filter((transaction) => {
     switch (tabValue) {
-      case 1: return transaction.status === 'PENDING';
-      case 2: return transaction.status === 'VERIFYING';
-      case 3: return transaction.status === 'COMPLETED';
-      case 4: return transaction.status === 'CANCELLED';
-      default: return true;
+      case 1:
+        return transaction.status === "PENDING";
+      case 2:
+        return transaction.status === "VERIFYING";
+      case 3:
+        return transaction.status === "COMPLETED";
+      case 4:
+        return transaction.status === "CANCELLED";
+      default:
+        return true;
     }
   });
 
@@ -189,9 +202,15 @@ const PaymentManagement = () => {
     <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
       {/* Header */}
       <Paper elevation={2} sx={{ p: 4, mb: 4, borderRadius: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          flexWrap="wrap"
+          gap={2}
+        >
           <Box display="flex" alignItems="center" gap={2}>
-            <Payment sx={{ fontSize: 40, color: 'primary.main' }} />
+            <Payment sx={{ fontSize: 40, color: "primary.main" }} />
             <Box>
               <Typography variant="h4" component="h1">
                 Gestión de Pagos y Transacciones
@@ -201,7 +220,11 @@ const PaymentManagement = () => {
               </Typography>
             </Box>
           </Box>
-          <Button variant="outlined" startIcon={<Refresh />} onClick={loadTransactions}>
+          <Button
+            variant="outlined"
+            startIcon={<Refresh />}
+            onClick={loadTransactions}
+          >
             Actualizar
           </Button>
         </Box>
@@ -211,8 +234,10 @@ const PaymentManagement = () => {
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={2}>
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <AttachMoney sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+            <CardContent sx={{ textAlign: "center" }}>
+              <AttachMoney
+                sx={{ fontSize: 40, color: "primary.main", mb: 1 }}
+              />
               <Typography color="textSecondary" gutterBottom>
                 Total Recaudado
               </Typography>
@@ -224,8 +249,8 @@ const PaymentManagement = () => {
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <TrendingUp sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+            <CardContent sx={{ textAlign: "center" }}>
+              <TrendingUp sx={{ fontSize: 40, color: "success.main", mb: 1 }} />
               <Typography color="textSecondary" gutterBottom>
                 Completadas
               </Typography>
@@ -237,8 +262,8 @@ const PaymentManagement = () => {
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <Payment sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+            <CardContent sx={{ textAlign: "center" }}>
+              <Payment sx={{ fontSize: 40, color: "warning.main", mb: 1 }} />
               <Typography color="textSecondary" gutterBottom>
                 Pendientes
               </Typography>
@@ -250,8 +275,8 @@ const PaymentManagement = () => {
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <People sx={{ fontSize: 40, color: 'info.main', mb: 1 }} />
+            <CardContent sx={{ textAlign: "center" }}>
+              <People sx={{ fontSize: 40, color: "info.main", mb: 1 }} />
               <Typography color="textSecondary" gutterBottom>
                 En Verificación
               </Typography>
@@ -263,8 +288,8 @@ const PaymentManagement = () => {
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <Close sx={{ fontSize: 40, color: 'error.main', mb: 1 }} />
+            <CardContent sx={{ textAlign: "center" }}>
+              <Close sx={{ fontSize: 40, color: "error.main", mb: 1 }} />
               <Typography color="textSecondary" gutterBottom>
                 Canceladas
               </Typography>
@@ -276,13 +301,11 @@ const PaymentManagement = () => {
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
+            <CardContent sx={{ textAlign: "center" }}>
               <Typography color="textSecondary" gutterBottom>
                 Total
               </Typography>
-              <Typography variant="h5">
-                {stats.total}
-              </Typography>
+              <Typography variant="h5">{stats.total}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -290,8 +313,8 @@ const PaymentManagement = () => {
 
       {/* Tabs de filtrado */}
       <Paper sx={{ mb: 2 }}>
-        <Tabs 
-          value={tabValue} 
+        <Tabs
+          value={tabValue}
           onChange={(e, newValue) => setTabValue(newValue)}
           variant="scrollable"
           scrollButtons="auto"
@@ -337,10 +360,10 @@ const PaymentManagement = () => {
                   )}
                 </TableCell>
                 <TableCell>
-                  <Chip 
-                    label={transaction.paymentMethod} 
+                  <Chip
+                    label={transaction.paymentMethod}
                     color={getPaymentMethodColor(transaction.paymentMethod)}
-                    size="small" 
+                    size="small"
                   />
                 </TableCell>
                 <TableCell>
@@ -360,30 +383,32 @@ const PaymentManagement = () => {
                   )}
                 </TableCell>
                 <TableCell>
-                  <Chip 
-                    label={transaction.status} 
+                  <Chip
+                    label={transaction.status}
                     color={getStatusColor(transaction.status)}
-                    size="small" 
+                    size="small"
                   />
                 </TableCell>
                 <TableCell>
-                  {new Date(transaction.createdAt).toLocaleDateString('es-VE')}
+                  {new Date(transaction.createdAt).toLocaleDateString("es-VE")}
                   <Typography variant="body2" color="textSecondary">
-                    {new Date(transaction.createdAt).toLocaleTimeString('es-VE')}
+                    {new Date(transaction.createdAt).toLocaleTimeString(
+                      "es-VE"
+                    )}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Box display="flex" gap={1}>
-                    <IconButton 
-                      size="small" 
+                    <IconButton
+                      size="small"
                       color="info"
                       onClick={() => handleViewDetails(transaction)}
                       title="Ver detalles"
                     >
                       <Visibility />
                     </IconButton>
-                    <IconButton 
-                      size="small" 
+                    <IconButton
+                      size="small"
                       color="primary"
                       onClick={() => handleUpdateStatus(transaction)}
                       title="Editar estado"
@@ -407,7 +432,12 @@ const PaymentManagement = () => {
       )}
 
       {/* Diálogo de detalles */}
-      <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={detailDialogOpen}
+        onClose={() => setDetailDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>
           Detalles de Transacción #{selectedTransaction?.id}
         </DialogTitle>
@@ -415,63 +445,177 @@ const PaymentManagement = () => {
           {selectedTransaction && (
             <Grid container spacing={3} sx={{ mt: 1 }}>
               <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>Información del Cliente</Typography>
-                <Typography><strong>Nombre:</strong> {selectedTransaction.user?.firstName} {selectedTransaction.user?.lastName}</Typography>
-                <Typography><strong>Email:</strong> {selectedTransaction.user?.email}</Typography>
-                <Typography><strong>Teléfono:</strong> {selectedTransaction.user?.phone || 'No proporcionado'}</Typography>
+                <Typography variant="h6" gutterBottom>
+                  Información del Cliente
+                </Typography>
+                <Typography>
+                  <strong>Nombre:</strong> {selectedTransaction.user?.firstName}{" "}
+                  {selectedTransaction.user?.lastName}
+                </Typography>
+                <Typography>
+                  <strong>Email:</strong> {selectedTransaction.user?.email}
+                </Typography>
+                <Typography>
+                  <strong>Teléfono:</strong>{" "}
+                  {selectedTransaction.user?.phone || "No proporcionado"}
+                </Typography>
               </Grid>
-              
+
               <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>Información de Pago</Typography>
-                <Typography><strong>Método:</strong> 
-                  <Chip 
-                    label={selectedTransaction.paymentMethod} 
-                    color={getPaymentMethodColor(selectedTransaction.paymentMethod)}
-                    size="small" 
+                <Typography variant="h6" gutterBottom>
+                  Información de Pago
+                </Typography>
+                <Typography>
+                  <strong>Método:</strong>
+                  <Chip
+                    label={selectedTransaction.paymentMethod}
+                    color={getPaymentMethodColor(
+                      selectedTransaction.paymentMethod
+                    )}
+                    size="small"
                     sx={{ ml: 1 }}
                   />
                 </Typography>
-                <Typography><strong>Monto USD:</strong> ${selectedTransaction.amountUSD.toFixed(2)}</Typography>
+                <Typography>
+                  <strong>Monto USD:</strong> $
+                  {selectedTransaction.amountUSD.toFixed(2)}
+                </Typography>
                 {selectedTransaction.amountBS && (
-                  <Typography><strong>Monto BS:</strong> Bs. {selectedTransaction.amountBS.toFixed(2)}</Typography>
+                  <Typography>
+                    <strong>Monto BS:</strong> Bs.{" "}
+                    {selectedTransaction.amountBS.toFixed(2)}
+                  </Typography>
                 )}
                 {selectedTransaction.exchangeRate && (
-                  <Typography><strong>Tasa:</strong> {selectedTransaction.exchangeRate} BS/USD</Typography>
+                  <Typography>
+                    <strong>Tasa:</strong> {selectedTransaction.exchangeRate}{" "}
+                    BS/USD
+                  </Typography>
                 )}
-                <Typography><strong>Estado:</strong> 
-                  <Chip 
-                    label={selectedTransaction.status} 
+                <Typography>
+                  <strong>Estado:</strong>
+                  <Chip
+                    label={selectedTransaction.status}
                     color={getStatusColor(selectedTransaction.status)}
-                    size="small" 
+                    size="small"
                     sx={{ ml: 1 }}
                   />
                 </Typography>
               </Grid>
 
+              {selectedTransaction.orders &&
+                selectedTransaction.orders.length > 0 && (
+                  <Grid item xs={12}>
+                    <Typography variant="h6" gutterBottom>
+                      Productos Comprados
+                    </Typography>
+                    {selectedTransaction.orders.map((order, orderIndex) => (
+                      <Box key={orderIndex}>
+                        {order.items &&
+                          Array.isArray(order.items) &&
+                          order.items.map((item, itemIndex) => {
+                            // Obtener la primera imagen del producto o usar placeholder
+                            const productImage =
+                              item.productImages &&
+                              item.productImages.length > 0
+                                ? item.productImages[0].startsWith("http")
+                                  ? item.productImages[0]
+                                  : `http://localhost:5000${item.productImages[0]}`
+                                : "/images/placeholder-bracelet.jpg";
+
+                            return (
+                              <Box
+                                key={itemIndex}
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 2,
+                                  py: 1,
+                                  borderBottom: "1px solid #eee",
+                                  mb: 1,
+                                }}
+                              >
+                                <img
+                                  src={productImage}
+                                  alt={item.productName || "Producto"}
+                                  style={{
+                                    width: 50,
+                                    height: 50,
+                                    objectFit: "cover",
+                                    borderRadius: 4,
+                                  }}
+                                  onError={(e) => {
+                                    e.target.src =
+                                      "/images/placeholder-bracelet.jpg";
+                                  }}
+                                />
+                                <Box sx={{ flexGrow: 1 }}>
+                                  <Typography variant="body1" fontWeight="bold">
+                                    {item.productName ||
+                                      "Producto no disponible"}
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    color="textSecondary"
+                                  >
+                                    Cantidad: {item.quantity} | Precio: $
+                                    {item.price?.toFixed(2) || "0.00"}
+                                  </Typography>
+                                  {item.customization && (
+                                    <Typography
+                                      variant="body2"
+                                      color="textSecondary"
+                                    >
+                                      Personalización:{" "}
+                                      {item.customization.material},{" "}
+                                      {item.customization.color}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </Box>
+                            );
+                          })}
+                      </Box>
+                    ))}
+                  </Grid>
+                )}
+
               {selectedTransaction.reference && (
                 <Grid item xs={12} md={6}>
-                  <Typography variant="h6" gutterBottom>Información de Transacción</Typography>
-                  <Typography><strong>Referencia:</strong> {selectedTransaction.reference}</Typography>
+                  <Typography variant="h6" gutterBottom>
+                    Información de Transacción
+                  </Typography>
+                  <Typography>
+                    <strong>Referencia:</strong> {selectedTransaction.reference}
+                  </Typography>
                   {selectedTransaction.senderName && (
-                    <Typography><strong>Remitente:</strong> {selectedTransaction.senderName}</Typography>
+                    <Typography>
+                      <strong>Remitente:</strong>{" "}
+                      {selectedTransaction.senderName}
+                    </Typography>
                   )}
                   {selectedTransaction.senderPhone && (
-                    <Typography><strong>Teléfono Remitente:</strong> {selectedTransaction.senderPhone}</Typography>
+                    <Typography>
+                      <strong>Teléfono Remitente:</strong>{" "}
+                      {selectedTransaction.senderPhone}
+                    </Typography>
                   )}
                 </Grid>
               )}
 
               {selectedTransaction.screenshot && (
                 <Grid item xs={12}>
-                  <Typography variant="h6" gutterBottom>Comprobante de Pago</Typography>
-                  <img 
-                    src={`http://localhost:5000${selectedTransaction.screenshot}`} 
-                    alt="Comprobante de pago" 
-                    style={{ 
-                      maxWidth: '100%', 
-                      maxHeight: 400, 
-                      border: '1px solid #ddd',
-                      borderRadius: 8
+                  <Typography variant="h6" gutterBottom>
+                    Comprobante de Pago
+                  </Typography>
+                  <img
+                    src={`http://localhost:5000${selectedTransaction.screenshot}`}
+                    alt="Comprobante de pago"
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: 400,
+                      border: "1px solid #ddd",
+                      borderRadius: 8,
                     }}
                   />
                 </Grid>
@@ -479,8 +623,10 @@ const PaymentManagement = () => {
 
               {selectedTransaction.adminNotes && (
                 <Grid item xs={12}>
-                  <Typography variant="h6" gutterBottom>Notas del Administrador</Typography>
-                  <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                  <Typography variant="h6" gutterBottom>
+                    Notas del Administrador
+                  </Typography>
+                  <Paper sx={{ p: 2, bgcolor: "background.default" }}>
                     <Typography>{selectedTransaction.adminNotes}</Typography>
                   </Paper>
                 </Grid>
@@ -488,9 +634,18 @@ const PaymentManagement = () => {
 
               <Grid item xs={12}>
                 <Typography variant="body2" color="textSecondary">
-                  <strong>Creación:</strong> {new Date(selectedTransaction.createdAt).toLocaleString('es-VE')}
+                  <strong>Creación:</strong>{" "}
+                  {new Date(selectedTransaction.createdAt).toLocaleString(
+                    "es-VE"
+                  )}
                   {selectedTransaction.verifiedAt && (
-                    <> | <strong>Verificación:</strong> {new Date(selectedTransaction.verifiedAt).toLocaleString('es-VE')}</>
+                    <>
+                      {" "}
+                      | <strong>Verificación:</strong>{" "}
+                      {new Date(selectedTransaction.verifiedAt).toLocaleString(
+                        "es-VE"
+                      )}
+                    </>
                   )}
                 </Typography>
               </Grid>
@@ -503,7 +658,12 @@ const PaymentManagement = () => {
       </Dialog>
 
       {/* Diálogo para actualizar estado */}
-      <Dialog open={statusDialogOpen} onClose={() => setStatusDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={statusDialogOpen}
+        onClose={() => setStatusDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>
           Actualizar Estado - Transacción #{selectedTransaction?.id}
         </DialogTitle>
@@ -521,7 +681,7 @@ const PaymentManagement = () => {
               <MenuItem value="CANCELLED">Cancelada</MenuItem>
             </Select>
           </FormControl>
-          
+
           <TextField
             fullWidth
             multiline

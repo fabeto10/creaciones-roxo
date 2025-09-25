@@ -1,6 +1,6 @@
-import prisma from '../config/database.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import prisma from "../config/database.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,26 +9,30 @@ const __dirname = path.dirname(__filename);
 export const getProducts = async (req, res) => {
   try {
     const products = await prisma.product.findMany({
-      where: { isActive: true }
+      where: { isActive: true },
     });
 
-    // Procesar imágenes para asegurar URLs completas
-    const productsWithProcessedImages = products.map(product => ({
+    // Función auxiliar para procesar imágenes correctamente
+    const processImageUrl = (image) => {
+      if (!image) return "/images/placeholder-bracelet.jpg";
+      if (image.startsWith("http")) return image;
+      if (image.startsWith("/uploads/")) return `http://localhost:5000${image}`;
+      if (image.startsWith("/")) return `http://localhost:5000${image}`;
+      return `http://localhost:5000/uploads/${image}`;
+    };
+
+    const productsWithProcessedImages = products.map((product) => ({
       ...product,
-      images: product.images.map(image => {
-        if (image.startsWith('http')) {
-          return image;
-        }
-        if (image.startsWith('/')) {
-          return `http://localhost:5000${image}`;
-        }
-        return `http://localhost:5000/uploads/${image}`;
-      })
+      images: Array.isArray(product.images)
+        ? product.images.map(processImageUrl)
+        : [processImageUrl(product.images)],
     }));
 
     res.json(productsWithProcessedImages);
   } catch (error) {
-    res.status(500).json({ message: 'Error obteniendo productos', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error obteniendo productos", error: error.message });
   }
 };
 
@@ -37,43 +41,57 @@ export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
     const product = await prisma.product.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: parseInt(id) },
     });
 
     if (!product) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
+      return res.status(404).json({ message: "Producto no encontrado" });
     }
 
-    // Procesar imágenes para asegurar URLs completas
+    // Función auxiliar para procesar imágenes correctamente
+    const processImageUrl = (image) => {
+      if (!image) return "/images/placeholder-bracelet.jpg";
+      if (image.startsWith("http")) return image;
+      if (image.startsWith("/uploads/")) return `http://localhost:5000${image}`;
+      if (image.startsWith("/")) return `http://localhost:5000${image}`;
+      return `http://localhost:5000/uploads/${image}`;
+    };
+
     const productWithProcessedImages = {
       ...product,
-      images: product.images.map(image => {
-        if (image.startsWith('http')) {
-          return image;
-        }
-        if (image.startsWith('/')) {
-          return `http://localhost:5000${image}`;
-        }
-        return `http://localhost:5000/uploads/${image}`;
-      })
+      images: Array.isArray(product.images)
+        ? product.images.map(processImageUrl)
+        : [processImageUrl(product.images)],
     };
 
     res.json(productWithProcessedImages);
   } catch (error) {
-    res.status(500).json({ message: 'Error obteniendo producto', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error obteniendo producto", error: error.message });
   }
 };
-
 
 // POST crear producto
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, type, basePrice, category, customizable, stock, tags, availableMaterials, availableColors } = req.body;
+    const {
+      name,
+      description,
+      type,
+      basePrice,
+      category,
+      customizable,
+      stock,
+      tags,
+      availableMaterials,
+      availableColors,
+    } = req.body;
 
     // Procesar imágenes si existen
     let imagePaths = [];
     if (req.files && req.files.length > 0) {
-      imagePaths = req.files.map(file => `/uploads/${file.filename}`);
+      imagePaths = req.files.map((file) => `/uploads/${file.filename}`);
     }
 
     const product = await prisma.product.create({
@@ -83,19 +101,23 @@ export const createProduct = async (req, res) => {
         type,
         basePrice: parseFloat(basePrice),
         category,
-        customizable: customizable === 'true',
+        customizable: customizable === "true",
         stock: parseInt(stock) || 0,
         tags: tags ? JSON.parse(tags) : [],
-        availableMaterials: availableMaterials ? JSON.parse(availableMaterials) : null,
+        availableMaterials: availableMaterials
+          ? JSON.parse(availableMaterials)
+          : null,
         availableColors: availableColors ? JSON.parse(availableColors) : [],
-        images: imagePaths.length > 0 ? imagePaths : [] // Guardar como array
-      }
+        images: imagePaths.length > 0 ? imagePaths : [], // Guardar como array
+      },
     });
 
-    res.status(201).json({ message: 'Producto creado exitosamente', product });
+    res.status(201).json({ message: "Producto creado exitosamente", product });
   } catch (error) {
-    console.error('Error creando producto:', error);
-    res.status(500).json({ message: 'Error creando producto', error: error.message });
+    console.error("Error creando producto:", error);
+    res
+      .status(500)
+      .json({ message: "Error creando producto", error: error.message });
   }
 };
 
@@ -103,27 +125,116 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const {
+      name,
+      description,
+      type,
+      basePrice,
+      category,
+      customizable,
+      stock,
+      isActive,
+      tags,
+      availableMaterials,
+      availableColors,
+    } = req.body;
 
-    // Procesar nuevas imágenes si existen
-    if (req.files && req.files.length > 0) {
-      const newImagePaths = req.files.map(file => `/uploads/${file.filename}`);
-      updateData.images = newImagePaths;
+    console.log("📝 Update product request:", {
+      id,
+      body: req.body,
+      files: req.files,
+    });
+
+    // Validar campos requeridos
+    if (
+      !name ||
+      !description ||
+      !type ||
+      !basePrice ||
+      !category ||
+      stock === undefined
+    ) {
+      return res.status(400).json({
+        message:
+          "Campos requeridos faltantes: name, description, type, basePrice, category, stock",
+      });
     }
 
-    // Convertir campos JSON si existen
-    if (updateData.tags) updateData.tags = JSON.parse(updateData.tags);
-    if (updateData.availableMaterials) updateData.availableMaterials = JSON.parse(updateData.availableMaterials);
-    if (updateData.availableColors) updateData.availableColors = JSON.parse(updateData.availableColors);
+    // Obtener producto existente
+    const existingProduct = await prisma.product.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!existingProduct) {
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
+
+    // Preparar datos de actualización
+    const updateData = {
+      name,
+      description,
+      type,
+      basePrice: parseFloat(basePrice),
+      category,
+      customizable: customizable === "true" || customizable === true,
+      stock: parseInt(stock),
+      isActive: isActive === "true" || isActive === true,
+    };
+
+    // Procesar imágenes existentes + nuevas
+    let finalImages = existingProduct.images || [];
+
+    // Si hay imágenes nuevas
+    if (req.files && req.files.length > 0) {
+      const newImagePaths = req.files.map(
+        (file) => `/uploads/${file.filename}`
+      );
+      finalImages = [...finalImages, ...newImagePaths];
+    }
+
+    // Limitar a 5 imágenes máximo
+    updateData.images = finalImages.slice(0, 5);
+
+    // Procesar campos JSON de forma segura
+    try {
+      if (tags)
+        updateData.tags = typeof tags === "string" ? JSON.parse(tags) : tags;
+      if (availableMaterials)
+        updateData.availableMaterials =
+          typeof availableMaterials === "string"
+            ? JSON.parse(availableMaterials)
+            : availableMaterials;
+      if (availableColors)
+        updateData.availableColors =
+          typeof availableColors === "string"
+            ? JSON.parse(availableColors)
+            : availableColors;
+    } catch (parseError) {
+      console.error("❌ Error parsing JSON fields:", parseError);
+      return res.status(400).json({
+        message:
+          "Error en formato de campos JSON (tags, availableMaterials, availableColors)",
+      });
+    }
+
+    console.log("🔄 Updating product with data:", updateData);
 
     const product = await prisma.product.update({
       where: { id: parseInt(id) },
-      data: updateData
+      data: updateData,
     });
 
-    res.json({ message: 'Producto actualizado exitosamente', product });
+    res.json({
+      message: "Producto actualizado exitosamente",
+      product,
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Error actualizando producto', error: error.message });
+    console.error("❌ Error updating product:", error);
+    res.status(500).json({
+      message: "Error actualizando producto",
+      error: error.message,
+      stack: error.stack,
+    });
   }
 };
 
@@ -131,14 +242,16 @@ export const updateProduct = async (req, res) => {
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const product = await prisma.product.update({
       where: { id: parseInt(id) },
-      data: { isActive: false }
+      data: { isActive: false },
     });
 
-    res.json({ message: 'Producto eliminado exitosamente', product });
+    res.json({ message: "Producto eliminado exitosamente", product });
   } catch (error) {
-    res.status(500).json({ message: 'Error eliminando producto', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error eliminando producto", error: error.message });
   }
 };

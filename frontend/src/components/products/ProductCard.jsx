@@ -36,29 +36,42 @@ const ProductCard = ({ product }) => {
 
   const priceInfo = calculatePriceInfo(product.basePrice);
   const getProductImages = () => {
-    console.log("🔍 Procesando imágenes para:", product.name, product.images);
+    console.log(
+      "🔍 Procesando imágenes para:",
+      product.name,
+      "Imágenes raw:",
+      product.images
+    );
 
-    // Si el producto tiene imágenes definidas
+    // Si el producto tiene imágenes definidas y es un array válido
     if (
       product.images &&
       Array.isArray(product.images) &&
       product.images.length > 0
     ) {
-      const processedImages = product.images.map((img) => {
-        if (!img || img === "null" || img === "undefined") {
-          return "/images/placeholder-bracelet.jpg";
-        }
-        if (img.startsWith("http")) return img;
-        if (img.startsWith("/")) return `http://localhost:5000${img}`;
-        return `http://localhost:5000/uploads/${img}`;
-      });
-      console.log("✅ Imágenes procesadas:", processedImages);
-      return processedImages;
+      const validImages = product.images.filter(
+        (img) => img && img !== "null" && img !== "undefined" && img !== ""
+      );
+
+      if (validImages.length > 0) {
+        const processedImages = validImages.map((img) => {
+          // Si ya es una URL completa, dejarla como está
+          if (img.startsWith("http")) return img;
+
+          // Si empieza con /uploads/, construir la URL completa
+          if (img.startsWith("/uploads/")) return `http://localhost:5000${img}`;
+
+          // Si es solo un nombre de archivo, construir la ruta completa
+          return `http://localhost:5000/uploads/${img}`;
+        });
+
+        console.log("✅ Imágenes procesadas:", processedImages);
+        return processedImages;
+      }
     }
 
+    // Fallback si no hay imágenes válidas
     console.log("⚠️ Usando imagen de fallback para:", product.name);
-
-    // Imágenes de fallback
     const sampleImages = {
       pulsera: "/images/products/Gemini_Generated_Image_hn9gvzhn9gvzhn9g.png",
       dije: "/images/products/Gemini_Generated_Image_j3wtxcj3wtxcj3wt.png",
@@ -96,11 +109,27 @@ const ProductCard = ({ product }) => {
   };
 
   const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % images.length);
+    if (images.length <= 1) {
+      console.log("ℹ️ Solo hay una imagen, no se puede navegar");
+      return;
+    }
+    setCurrentImageIndex((prevIndex) => {
+      const newIndex = (prevIndex + 1) % images.length;
+      console.log("➡️ Navegando a imagen:", newIndex);
+      return newIndex;
+    });
   };
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
+    if (images.length <= 1) {
+      console.log("ℹ️ Solo hay una imagen, no se puede navegar");
+      return;
+    }
+    setCurrentImageIndex((prevIndex) => {
+      const newIndex = (prevIndex - 1 + images.length) % images.length;
+      console.log("⬅️ Navegando a imagen:", newIndex);
+      return newIndex;
+    });
   };
 
   return (
@@ -304,10 +333,12 @@ const ProductCard = ({ product }) => {
                 onClick={prevImage}
                 sx={{
                   position: "absolute",
-                  left: 0,
+                  left: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   zIndex: 1,
+                  bgcolor: "rgba(255,255,255,0.8)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,1)" },
                 }}
               >
                 <NavigateBefore />
@@ -316,7 +347,7 @@ const ProductCard = ({ product }) => {
 
             <ImageWithFallback
               src={images[currentImageIndex]}
-              alt={product.name}
+              alt={`${product.name} - Imagen ${currentImageIndex + 1}`}
               fallbackSrc="/images/placeholder-bracelet.jpg"
               style={{
                 width: "100%",
@@ -331,16 +362,29 @@ const ProductCard = ({ product }) => {
                 onClick={nextImage}
                 sx={{
                   position: "absolute",
-                  right: 0,
+                  right: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   zIndex: 1,
+                  bgcolor: "rgba(255,255,255,0.8)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,1)" },
                 }}
               >
                 <NavigateNext />
               </IconButton>
             )}
           </Box>
+
+          {/* Indicador de imágenes */}
+          {images.length > 1 && (
+            <Box textAlign="center" mt={2}>
+              <Chip
+                label={`${currentImageIndex + 1} / ${images.length}`}
+                color="primary"
+                variant="outlined"
+              />
+            </Box>
+          )}
         </DialogContent>
       </Dialog>
     </>

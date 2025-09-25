@@ -192,29 +192,37 @@ export const createTransaction = async (req, res) => {
 // Obtener transacciones del usuario
 export const getUserTransactions = async (req, res) => {
   try {
-    const userId = req.user.id;
-
     const transactions = await prisma.transaction.findMany({
-      where: { userId },
       include: {
-        orders: {
+        user: {
           select: {
             id: true,
-            items: true,
-            status: true,
-            createdAt: true,
-          },
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          }
         },
+        orders: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true
+              }
+            }
+          }
+        }
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: {
+        createdAt: 'desc'
+      }
     });
 
-    res.json(transactions);
+    res.json({ transactions });
   } catch (error) {
-    console.error("Error getting user transactions:", error);
-    res
-      .status(500)
-      .json({ message: "Error getting transactions", error: error.message });
+    res.status(500).json({ message: 'Error obteniendo transacciones', error: error.message });
   }
 };
 

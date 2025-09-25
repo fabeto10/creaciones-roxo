@@ -169,25 +169,24 @@ const CheckoutPage = () => {
         throw new Error("La referencia de pago móvil es requerida");
       }
 
+      // Crear items con información completa del producto
+      const itemsWithProductInfo = cartItems.map((item) => ({
+        productId: item.product.id,
+        productName: item.product.name,
+        productDescription: item.product.description,
+        productImages: item.product.images || [],
+        productType: item.product.type,
+        price: item.price,
+        quantity: item.quantity,
+        customization: item.customization,
+        basePrice: item.product.basePrice,
+      }));
+
+      console.log("📦 Items con información completa:", itemsWithProductInfo);
+
       // Crear FormData para la transacción
       const formData = new FormData();
-      formData.append(
-        "items",
-        JSON.stringify(
-          cartItems.map((item) => ({
-            id: item.id,
-            product: {
-              id: item.product.id,
-              name: item.product.name,
-              basePrice: item.product.basePrice,
-            },
-            price: item.price,
-            quantity: item.quantity,
-            customization: item.customization,
-          }))
-        )
-      );
-
+      formData.append("items", JSON.stringify(itemsWithProductInfo));
       formData.append("paymentMethod", paymentMethod);
       formData.append("paymentDetails", JSON.stringify(paymentDetails));
 

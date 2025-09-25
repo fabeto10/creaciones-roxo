@@ -20,6 +20,7 @@ import StorePage from "./pages/customer/StorePage";
 import CheckoutPage from "./pages/customer/CheckoutPage";
 import OrderConfirmationPage from "./pages/customer/OrderConfirmationPage";
 import OrderHistoryPage from "./pages/customer/OrderHistoryPage";
+import ExternalProductRequests from "./pages/admin/ExternalProductRequests";
 
 function App() {
   return (
@@ -59,6 +60,10 @@ function App() {
                         element={<CustomerManagement />}
                       />
                       <Route path="payments" element={<PaymentManagement />} />
+                      <Route
+                        path="external-requests"
+                        element={<ExternalProductRequests />}
+                      />
                     </Routes>
                   </ProtectedRoute>
                 }
