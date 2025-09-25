@@ -160,7 +160,10 @@ export const createTransaction = async (req, res) => {
       totalUSD: finalAmountUSD,
       paymentMethod: paymentMethod,
       paymentDetails: parsedPaymentDetails,
-      status: transactionDataForPrisma.status === "VERIFYING" ? "verifying" : "pending",
+      status:
+        transactionDataForPrisma.status === "VERIFYING"
+          ? "verifying"
+          : "pending",
     };
 
     if (transactionDataForPrisma.amountBS) {
@@ -190,9 +193,26 @@ export const createTransaction = async (req, res) => {
   }
 };
 // Obtener transacciones del usuario
+// En getUserTransactions - agregar más logs de verificación
 export const getUserTransactions = async (req, res) => {
   try {
+    console.log("🔐 USER OBJECT EN CONTROLLER:", req.user);
+
+    const userId = req.user?.id;
+
+    if (!userId) {
+      console.error("❌ ERROR: userId no disponible en req.user");
+      return res.status(400).json({
+        message: "ID de usuario no disponible en la solicitud",
+      });
+    }
+
+    console.log("🔍 Buscando transacciones para usuario ID:", userId);
+
     const transactions = await prisma.transaction.findMany({
+      where: {
+        userId: parseInt(userId), // Asegurar que sea número
+      },
       include: {
         user: {
           select: {
@@ -200,8 +220,8 @@ export const getUserTransactions = async (req, res) => {
             firstName: true,
             lastName: true,
             email: true,
-            phone: true
-          }
+            phone: true,
+          },
         },
         orders: {
           include: {
@@ -209,20 +229,38 @@ export const getUserTransactions = async (req, res) => {
               select: {
                 firstName: true,
                 lastName: true,
-                email: true
-              }
-            }
-          }
-        }
+                email: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: "desc",
+      },
+    });
+
+    console.log(
+      `📊 Encontradas ${transactions.length} transacciones para usuario ${userId}`
+    );
+
+    // Verificar que las transacciones pertenecen al usuario correcto
+    transactions.forEach((transaction) => {
+      if (transaction.userId !== parseInt(userId)) {
+        console.warn("⚠️ ADVERTENCIA: Transacción con userId incorrecto:", {
+          transactionUserId: transaction.userId,
+          expectedUserId: userId,
+        });
       }
     });
 
     res.json({ transactions });
   } catch (error) {
-    res.status(500).json({ message: 'Error obteniendo transacciones', error: error.message });
+    console.error("❌ Error obteniendo transacciones del usuario:", error);
+    res.status(500).json({
+      message: "Error obteniendo transacciones",
+      error: error.message,
+    });
   }
 };
 
@@ -233,11 +271,14 @@ export const getAllTransactions = async (req, res) => {
 
     const where = status ? { status } : {};
 
+    console.log("👨‍💼 Admin viendo todas las transacciones");
+
     const transactions = await prisma.transaction.findMany({
       where,
       include: {
         user: {
           select: {
+            id: true,
             firstName: true,
             lastName: true,
             email: true,
@@ -270,9 +311,10 @@ export const getAllTransactions = async (req, res) => {
     });
   } catch (error) {
     console.error("Error getting all transactions:", error);
-    res
-      .status(500)
-      .json({ message: "Error getting transactions", error: error.message });
+    res.status(500).json({
+      message: "Error getting transactions",
+      error: error.message,
+    });
   }
 };
 

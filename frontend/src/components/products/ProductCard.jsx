@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -30,60 +30,66 @@ const ProductCard = ({ product }) => {
   const [customizerOpen, setCustomizerOpen] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [images, setImages] = useState([]);
   const { addToCart, calculatePriceInfo } = useCart();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const priceInfo = calculatePriceInfo(product.basePrice);
-  const getProductImages = () => {
-    console.log(
-      "🔍 Procesando imágenes para:",
-      product.name,
-      "Imágenes raw:",
-      product.images
-    );
 
-    // Si el producto tiene imágenes definidas y es un array válido
-    if (
-      product.images &&
-      Array.isArray(product.images) &&
-      product.images.length > 0
-    ) {
-      const validImages = product.images.filter(
-        (img) => img && img !== "null" && img !== "undefined" && img !== ""
+  // Procesar imágenes una vez cuando el componente se monta o el producto cambia
+  useEffect(() => {
+    const getProductImages = () => {
+      console.log(
+        "🔍 Procesando imágenes para:",
+        product.name,
+        "Raw images:",
+        product.images
       );
 
-      if (validImages.length > 0) {
-        const processedImages = validImages.map((img) => {
-          // Si ya es una URL completa, dejarla como está
-          if (img.startsWith("http")) return img;
+      // Verificación robusta de imágenes
+      if (product.images && Array.isArray(product.images)) {
+        const validImages = product.images.filter(
+          (img) =>
+            img &&
+            img !== "null" &&
+            img !== "undefined" &&
+            img !== "" &&
+            !img.includes("undefined")
+        );
 
-          // Si empieza con /uploads/, construir la URL completa
-          if (img.startsWith("/uploads/")) return `http://localhost:5000${img}`;
+        if (validImages.length > 0) {
+          const processedImages = validImages.map((img) => {
+            if (typeof img !== "string")
+              return "/images/placeholder-bracelet.jpg";
+            if (img.startsWith("http")) return img;
+            if (img.startsWith("/uploads/"))
+              return `http://localhost:5000${img}`;
+            if (img.startsWith("/")) return `http://localhost:5000${img}`;
+            return `http://localhost:5000/uploads/${img}`;
+          });
 
-          // Si es solo un nombre de archivo, construir la ruta completa
-          return `http://localhost:5000/uploads/${img}`;
-        });
-
-        console.log("✅ Imágenes procesadas:", processedImages);
-        return processedImages;
+          console.log("✅ Imágenes procesadas:", processedImages);
+          return processedImages;
+        }
       }
-    }
 
-    // Fallback si no hay imágenes válidas
-    console.log("⚠️ Usando imagen de fallback para:", product.name);
-    const sampleImages = {
-      pulsera: "/images/products/Gemini_Generated_Image_hn9gvzhn9gvzhn9g.png",
-      dije: "/images/products/Gemini_Generated_Image_j3wtxcj3wtxcj3wt.png",
-      material: "/images/products/Gemini_Generated_Image_s1maars1maars1ma.png",
-      combo: "/images/products/Gemini_Generated_Image_2rj99a2rj99a2rj9.png",
+      // Fallback
+      console.log("⚠️ Usando imagen de fallback");
+      const sampleImages = {
+        pulsera: "/images/products/Gemini_Generated_Image_hn9gvzhn9gvzhn9g.png",
+        dije: "/images/products/Gemini_Image_j3wtxcj3wtxcj3wt.png",
+        material: "/images/products/Gemini_Image_s1maars1maars1ma.png",
+        combo: "/images/products/Gemini_Image_2rj99a2rj99a2rj9.png",
+      };
+
+      const imageKey = product.type || product.category || "pulsera";
+      return [sampleImages[imageKey] || sampleImages.pulsera];
     };
 
-    const imageKey = product.type || product.category || "pulsera";
-    return [sampleImages[imageKey] || sampleImages.pulsera];
-  };
-
-  const images = getProductImages();
+    setImages(getProductImages());
+    setCurrentImageIndex(0); // Resetear índice cuando cambia el producto
+  }, [product]);
 
   const handleAddToCart = () => {
     if (!isAuthenticated) {
@@ -109,25 +115,21 @@ const ProductCard = ({ product }) => {
   };
 
   const nextImage = () => {
-    if (images.length <= 1) {
-      console.log("ℹ️ Solo hay una imagen, no se puede navegar");
-      return;
-    }
+    if (images.length <= 1) return;
+
     setCurrentImageIndex((prevIndex) => {
       const newIndex = (prevIndex + 1) % images.length;
-      console.log("➡️ Navegando a imagen:", newIndex);
+      console.log("➡️ Navegando a imagen:", newIndex, "URL:", images[newIndex]);
       return newIndex;
     });
   };
 
   const prevImage = () => {
-    if (images.length <= 1) {
-      console.log("ℹ️ Solo hay una imagen, no se puede navegar");
-      return;
-    }
+    if (images.length <= 1) return;
+
     setCurrentImageIndex((prevIndex) => {
       const newIndex = (prevIndex - 1 + images.length) % images.length;
-      console.log("⬅️ Navegando a imagen:", newIndex);
+      console.log("⬅️ Navegando a imagen:", newIndex, "URL:", images[newIndex]);
       return newIndex;
     });
   };
@@ -151,14 +153,27 @@ const ProductCard = ({ product }) => {
           sx={{
             position: "relative",
             width: "100%",
-            height: 250, // ALTURA FIJA en lugar de paddingTop
+            height: 250,
             cursor: "pointer",
             overflow: "hidden",
-            backgroundColor: "grey.100", // Fondo temporal para debug
+            backgroundColor: "grey.100",
           }}
           onClick={() => openImageDialog(0)}
         >
-          <ImageWithFallback
+          <img
+            src={images[0]} // Usar imágenes[0] directamente
+            alt={product.name}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+            onError={(e) => {
+              console.error("Error cargando imagen principal:", images[0]);
+              e.target.src = "/images/placeholder-bracelet.jpg"; // Verifica que esta ruta sea correcta
+            }}
+          />
+          {/* <ImageWithFallback
             src={images[0]}
             alt={product.name}
             fallbackSrc="/images/placeholder-bracelet.jpg"
@@ -167,12 +182,27 @@ const ProductCard = ({ product }) => {
               height: "100%",
               objectFit: "cover",
             }}
-          />
+          /> */}
+          {images.length > 1 && (
+            <Chip
+              label={`${images.length} imágenes`}
+              size="small"
+              sx={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                bgcolor: "rgba(0,0,0,0.7)",
+                color: "white",
+                fontSize: "0.7rem",
+              }}
+            />
+          )}
         </Box>
 
         <CardContent
           sx={{ flexGrow: 1, display: "flex", flexDirection: "column", p: 2 }}
         >
+          {/* ... (el resto del contenido de la tarjeta permanece igual) */}
           <Box sx={{ flexGrow: 1 }}>
             <Typography variant="h6" gutterBottom fontWeight="600">
               {product.name}
@@ -201,7 +231,7 @@ const ProductCard = ({ product }) => {
           </Box>
 
           <Box sx={{ mt: "auto", pt: 1 }}>
-            {/* PRECIO PRINCIPAL EN BS (PRECIO NORMAL) */}
+            {/* PRECIO PRINCIPAL EN BS */}
             <Typography
               variant="h5"
               color="primary"
@@ -302,12 +332,17 @@ const ProductCard = ({ product }) => {
         }}
       />
 
-      {/* Diálogo para ver imagen en grande */}
+      {/* Diálogo del carrusel - VERSIÓN CORREGIDA */}
       <Dialog
         open={imageDialogOpen}
         onClose={() => setImageDialogOpen(false)}
         maxWidth="md"
         fullWidth
+        PaperProps={{
+          sx: {
+            maxHeight: "90vh",
+          },
+        }}
       >
         <DialogTitle>
           <Box
@@ -327,6 +362,8 @@ const ProductCard = ({ product }) => {
             display="flex"
             alignItems="center"
             justifyContent="center"
+            minHeight={400}
+            sx={{ py: 2 }}
           >
             {images.length > 1 && (
               <IconButton
@@ -337,25 +374,40 @@ const ProductCard = ({ product }) => {
                   top: "50%",
                   transform: "translateY(-50%)",
                   zIndex: 1,
-                  bgcolor: "rgba(255,255,255,0.8)",
-                  "&:hover": { bgcolor: "rgba(255,255,255,1)" },
+                  bgcolor: "rgba(255,255,255,0.9)",
+                  "&:hover": { bgcolor: "white" },
+                  boxShadow: 2,
                 }}
               >
                 <NavigateBefore />
               </IconButton>
             )}
 
-            <ImageWithFallback
-              src={images[currentImageIndex]}
-              alt={`${product.name} - Imagen ${currentImageIndex + 1}`}
-              fallbackSrc="/images/placeholder-bracelet.jpg"
-              style={{
-                width: "100%",
-                maxHeight: "70vh",
-                objectFit: "contain",
-                borderRadius: "8px",
-              }}
-            />
+            {/* IMAGEN PRINCIPAL - FORZAR RE-RENDER CON KEY ÚNICO */}
+            <Box
+              key={`image-${currentImageIndex}`}
+              sx={{ width: "100%", textAlign: "center" }}
+            >
+              <img
+                src={images[currentImageIndex]}
+                alt={`${product.name} - Imagen ${currentImageIndex + 1}`}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "60vh",
+                  objectFit: "contain",
+                  borderRadius: "8px",
+                  display: "block",
+                  margin: "0 auto",
+                }}
+                onError={(e) => {
+                  console.error(
+                    "❌ Error cargando imagen:",
+                    images[currentImageIndex]
+                  );
+                  e.target.src = "/images/placeholder-bracelet.jpg";
+                }}
+              />
+            </Box>
 
             {images.length > 1 && (
               <IconButton
@@ -366,8 +418,9 @@ const ProductCard = ({ product }) => {
                   top: "50%",
                   transform: "translateY(-50%)",
                   zIndex: 1,
-                  bgcolor: "rgba(255,255,255,0.8)",
-                  "&:hover": { bgcolor: "rgba(255,255,255,1)" },
+                  bgcolor: "rgba(255,255,255,0.9)",
+                  "&:hover": { bgcolor: "white" },
+                  boxShadow: 2,
                 }}
               >
                 <NavigateNext />
@@ -375,14 +428,57 @@ const ProductCard = ({ product }) => {
             )}
           </Box>
 
-          {/* Indicador de imágenes */}
+          {/* Indicador de posición y miniaturas */}
           {images.length > 1 && (
             <Box textAlign="center" mt={2}>
               <Chip
                 label={`${currentImageIndex + 1} / ${images.length}`}
                 color="primary"
                 variant="outlined"
+                sx={{ mb: 1 }}
               />
+
+              {/* Miniaturas */}
+              <Box
+                display="flex"
+                justifyContent="center"
+                gap={1}
+                flexWrap="wrap"
+              >
+                {images.map((image, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      width: 60,
+                      height: 60,
+                      cursor: "pointer",
+                      border:
+                        index === currentImageIndex
+                          ? "2px solid #e91e63"
+                          : "1px solid #ddd",
+                      borderRadius: 1,
+                      overflow: "hidden",
+                      opacity: index === currentImageIndex ? 1 : 0.7,
+                      transition: "all 0.2s ease",
+                      "&:hover": {
+                        opacity: 1,
+                        borderColor: "#e91e63",
+                      },
+                    }}
+                    onClick={() => setCurrentImageIndex(index)}
+                  >
+                    <img
+                      src={image}
+                      alt={`Miniatura ${index + 1}`}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                    />
+                  </Box>
+                ))}
+              </Box>
             </Box>
           )}
         </DialogContent>
