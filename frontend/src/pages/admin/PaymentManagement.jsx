@@ -32,7 +32,6 @@ import {
 import {
   Payment,
   Check,
-  Close,
   Visibility,
   Refresh,
   Upload,
@@ -40,7 +39,10 @@ import {
   TrendingUp,
   AttachMoney,
   People,
+  Close
 } from "@mui/icons-material";
+
+import { useNavigate } from "react-router-dom";
 
 const PaymentManagement = () => {
   const [transactions, setTransactions] = useState([]);
@@ -435,224 +437,254 @@ const PaymentManagement = () => {
       <Dialog
         open={detailDialogOpen}
         onClose={() => setDetailDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
       >
         <DialogTitle>
-          Detalles de Transacción #{selectedTransaction?.id}
+          <Box
+            display="flex"
+            alignItems="center"
+            justifyContent="space-between"
+          >
+            <Typography variant="h6">
+              Detalles del Producto - {viewingProduct?.name}
+            </Typography>
+            <IconButton onClick={() => setDetailDialogOpen(false)} size="small">
+              <Close />
+            </IconButton>
+          </Box>
         </DialogTitle>
+
         <DialogContent>
-          {selectedTransaction && (
-            <Grid container spacing={3} sx={{ mt: 1 }}>
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>
-                  Información del Cliente
-                </Typography>
-                <Typography>
-                  <strong>Nombre:</strong> {selectedTransaction.user?.firstName}{" "}
-                  {selectedTransaction.user?.lastName}
-                </Typography>
-                <Typography>
-                  <strong>Email:</strong> {selectedTransaction.user?.email}
-                </Typography>
-                <Typography>
-                  <strong>Teléfono:</strong>{" "}
-                  {selectedTransaction.user?.phone || "No proporcionado"}
-                </Typography>
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>
-                  Información de Pago
-                </Typography>
-                <Typography>
-                  <strong>Método:</strong>
-                  <Chip
-                    label={selectedTransaction.paymentMethod}
-                    color={getPaymentMethodColor(
-                      selectedTransaction.paymentMethod
-                    )}
-                    size="small"
-                    sx={{ ml: 1 }}
-                  />
-                </Typography>
-                <Typography>
-                  <strong>Monto USD:</strong> $
-                  {selectedTransaction.amountUSD.toFixed(2)}
-                </Typography>
-                {selectedTransaction.amountBS && (
-                  <Typography>
-                    <strong>Monto BS:</strong> Bs.{" "}
-                    {selectedTransaction.amountBS.toFixed(2)}
-                  </Typography>
-                )}
-                {selectedTransaction.exchangeRate && (
-                  <Typography>
-                    <strong>Tasa:</strong> {selectedTransaction.exchangeRate}{" "}
-                    BS/USD
-                  </Typography>
-                )}
-                <Typography>
-                  <strong>Estado:</strong>
-                  <Chip
-                    label={selectedTransaction.status}
-                    color={getStatusColor(selectedTransaction.status)}
-                    size="small"
-                    sx={{ ml: 1 }}
-                  />
-                </Typography>
-              </Grid>
-
-              {selectedTransaction.orders &&
-                selectedTransaction.orders.length > 0 && (
-                  <Grid item xs={12}>
-                    <Typography variant="h6" gutterBottom>
-                      Productos Comprados
-                    </Typography>
-                    {selectedTransaction.orders.map((order, orderIndex) => (
-                      <Box key={orderIndex}>
-                        {order.items &&
-                          Array.isArray(order.items) &&
-                          order.items.map((item, itemIndex) => {
-                            // Obtener la primera imagen del producto o usar placeholder
-                            const productImage =
-                              item.productImages &&
-                              item.productImages.length > 0
-                                ? item.productImages[0].startsWith("http")
-                                  ? item.productImages[0]
-                                  : `http://localhost:5000${item.productImages[0]}`
-                                : "/images/placeholder-bracelet.jpg";
-
-                            return (
-                              <Box
-                                key={itemIndex}
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 2,
-                                  py: 1,
-                                  borderBottom: "1px solid #eee",
-                                  mb: 1,
-                                }}
-                              >
-                                <img
-                                  src={productImage}
-                                  alt={item.productName || "Producto"}
-                                  style={{
-                                    width: 50,
-                                    height: 50,
-                                    objectFit: "cover",
-                                    borderRadius: 4,
-                                  }}
-                                  onError={(e) => {
-                                    e.target.src =
-                                      "/images/placeholder-bracelet.jpg";
-                                  }}
-                                />
-                                <Box sx={{ flexGrow: 1 }}>
-                                  <Typography variant="body1" fontWeight="bold">
-                                    {item.productName ||
-                                      "Producto no disponible"}
-                                  </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    color="textSecondary"
-                                  >
-                                    Cantidad: {item.quantity} | Precio: $
-                                    {item.price?.toFixed(2) || "0.00"}
-                                  </Typography>
-                                  {item.customization && (
-                                    <Typography
-                                      variant="body2"
-                                      color="textSecondary"
-                                    >
-                                      Personalización:{" "}
-                                      {item.customization.material},{" "}
-                                      {item.customization.color}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              </Box>
-                            );
-                          })}
-                      </Box>
-                    ))}
-                  </Grid>
-                )}
-
-              {selectedTransaction.reference && (
+          {viewingProduct && (
+            <Box sx={{ mt: 2 }}>
+              <Grid container spacing={3}>
+                {/* Galería de imágenes MEJORADA */}
                 <Grid item xs={12} md={6}>
-                  <Typography variant="h6" gutterBottom>
-                    Información de Transacción
+                  <Typography variant="h6" gutterBottom color="primary">
+                    🖼️ Imágenes del Producto
                   </Typography>
-                  <Typography>
-                    <strong>Referencia:</strong> {selectedTransaction.reference}
-                  </Typography>
-                  {selectedTransaction.senderName && (
-                    <Typography>
-                      <strong>Remitente:</strong>{" "}
-                      {selectedTransaction.senderName}
+                  {viewingProduct.images && viewingProduct.images.length > 0 ? (
+                    <Box>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 2,
+                          justifyContent: { xs: "center", md: "flex-start" },
+                        }}
+                      >
+                        {viewingProduct.images.map((img, index) => {
+                          const imageUrl = img.startsWith("http")
+                            ? img
+                            : `http://localhost:5000${img}`;
+
+                          return (
+                            <Box
+                              key={index}
+                              sx={{
+                                position: "relative",
+                                cursor: "pointer",
+                                "&:hover": { transform: "scale(1.05)" },
+                                transition: "transform 0.2s",
+                              }}
+                              onClick={() => window.open(imageUrl, "_blank")}
+                              title="Haz clic para ver la imagen en tamaño completo"
+                            >
+                              <img
+                                src={imageUrl}
+                                alt={`${viewingProduct.name} ${index + 1}`}
+                                style={{
+                                  width: 120,
+                                  height: 120,
+                                  objectFit: "cover",
+                                  borderRadius: 8,
+                                  border: "2px solid #e0e0e0",
+                                }}
+                                onError={(e) =>
+                                  (e.target.src =
+                                    "/images/placeholder-bracelet.jpg")
+                                }
+                              />
+                              <Chip
+                                label={`${index + 1}`}
+                                size="small"
+                                sx={{
+                                  position: "absolute",
+                                  top: -8,
+                                  right: -8,
+                                  bgcolor: "primary.main",
+                                  color: "white",
+                                  fontSize: "0.7rem",
+                                  height: 20,
+                                  minWidth: 20,
+                                }}
+                              />
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        sx={{ mt: 1, display: "block" }}
+                      >
+                        {viewingProduct.images.length} imagen(es) - Clic en
+                        cualquier imagen para ampliar
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Box sx={{ textAlign: "center", py: 4 }}>
+                      <img
+                        src="/images/placeholder-bracelet.jpg"
+                        alt="Sin imágenes"
+                        style={{
+                          width: 150,
+                          height: 150,
+                          objectFit: "cover",
+                          borderRadius: 8,
+                          opacity: 0.5,
+                        }}
+                      />
+                      <Typography
+                        variant="body2"
+                        color="textSecondary"
+                        sx={{ mt: 1 }}
+                      >
+                        No hay imágenes disponibles para este producto
+                      </Typography>
+                    </Box>
+                  )}
+                </Grid>
+
+                {/* Información del producto */}
+                <Grid item xs={12} md={6}>
+                  <Card variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="h6" gutterBottom color="primary">
+                      📋 Información del Producto
                     </Typography>
-                  )}
-                  {selectedTransaction.senderPhone && (
-                    <Typography>
-                      <strong>Teléfono Remitente:</strong>{" "}
-                      {selectedTransaction.senderPhone}
+                    <Divider sx={{ mb: 2 }} />
+
+                    <Grid container spacing={1}>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Nombre:
+                        </Typography>
+                        <Typography variant="body2" fontWeight="bold">
+                          {viewingProduct.name}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Tipo:
+                        </Typography>
+                        <Chip
+                          label={viewingProduct.type}
+                          size="small"
+                          color="primary"
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Precio:
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight="bold"
+                          color="success.main"
+                        >
+                          ${viewingProduct.basePrice}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Stock:
+                        </Typography>
+                        <Typography variant="body2" fontWeight="bold">
+                          {viewingProduct.stock}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Categoría:
+                        </Typography>
+                        <Typography variant="body2">
+                          {viewingProduct.category}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Estado:
+                        </Typography>
+                        <Chip
+                          label={
+                            viewingProduct.isActive ? "Activo" : "Inactivo"
+                          }
+                          size="small"
+                          color={
+                            viewingProduct.isActive ? "success" : "default"
+                          }
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Personalizable:
+                        </Typography>
+                        <Chip
+                          label={viewingProduct.customizable ? "Sí" : "No"}
+                          size="small"
+                          color={
+                            viewingProduct.customizable ? "info" : "default"
+                          }
+                        />
+                      </Grid>
+                    </Grid>
+
+                    <Typography variant="body2" sx={{ mt: 2 }}>
+                      <strong>Descripción:</strong> {viewingProduct.description}
                     </Typography>
-                  )}
-                </Grid>
-              )}
 
-              {selectedTransaction.screenshot && (
-                <Grid item xs={12}>
-                  <Typography variant="h6" gutterBottom>
-                    Comprobante de Pago
-                  </Typography>
-                  <img
-                    src={`http://localhost:5000${selectedTransaction.screenshot}`}
-                    alt="Comprobante de pago"
-                    style={{
-                      maxWidth: "100%",
-                      maxHeight: 400,
-                      border: "1px solid #ddd",
-                      borderRadius: 8,
-                    }}
-                  />
+                    {viewingProduct.tags && viewingProduct.tags.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="body2" color="textSecondary">
+                          Etiquetas:
+                        </Typography>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 0.5,
+                            mt: 0.5,
+                          }}
+                        >
+                          {viewingProduct.tags.map((tag, index) => (
+                            <Chip
+                              key={index}
+                              label={tag}
+                              size="small"
+                              variant="outlined"
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+                  </Card>
                 </Grid>
-              )}
-
-              {selectedTransaction.adminNotes && (
-                <Grid item xs={12}>
-                  <Typography variant="h6" gutterBottom>
-                    Notas del Administrador
-                  </Typography>
-                  <Paper sx={{ p: 2, bgcolor: "background.default" }}>
-                    <Typography>{selectedTransaction.adminNotes}</Typography>
-                  </Paper>
-                </Grid>
-              )}
-
-              <Grid item xs={12}>
-                <Typography variant="body2" color="textSecondary">
-                  <strong>Creación:</strong>{" "}
-                  {new Date(selectedTransaction.createdAt).toLocaleString(
-                    "es-VE"
-                  )}
-                  {selectedTransaction.verifiedAt && (
-                    <>
-                      {" "}
-                      | <strong>Verificación:</strong>{" "}
-                      {new Date(selectedTransaction.verifiedAt).toLocaleString(
-                        "es-VE"
-                      )}
-                    </>
-                  )}
-                </Typography>
               </Grid>
-            </Grid>
+            </Box>
           )}
         </DialogContent>
+
         <DialogActions>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setDetailDialogOpen(false);
+              navigate(`/tienda`);
+            }}
+          >
+            Ver en Tienda
+          </Button>
           <Button onClick={() => setDetailDialogOpen(false)}>Cerrar</Button>
         </DialogActions>
       </Dialog>

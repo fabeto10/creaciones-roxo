@@ -10,6 +10,8 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import {
   ShoppingCart,
@@ -17,7 +19,8 @@ import {
   Login,
   Logout,
   AdminPanelSettings,
-  Receipt, // AÑADE ESTE IMPORT
+  Receipt,
+  PersonAdd,
 } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCart } from "../../contexts/CartContext";
@@ -28,8 +31,9 @@ const Header = () => {
   const { user, isAuthenticated, logout, isAdmin } = useAuth();
   const { cartCount, setIsCartOpen } = useCart();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
-  // Estado para el menú de usuario
   const [anchorEl, setAnchorEl] = React.useState(null);
 
   const handleMenuOpen = (event) => {
@@ -51,6 +55,11 @@ const Header = () => {
     handleMenuClose();
   };
 
+  const handleAdminPanel = () => {
+    navigate("/admin");
+    handleMenuClose();
+  };
+
   return (
     <>
       <AppBar position="static" sx={{ bgcolor: "primary.main" }}>
@@ -64,7 +73,7 @@ const Header = () => {
               textDecoration: "none",
               color: "inherit",
               fontWeight: "bold",
-              fontSize: "1.3rem",
+              fontSize: { xs: "1.1rem", sm: "1.3rem" },
             }}
           >
             🎀 ROXO | Bisutería
@@ -75,23 +84,50 @@ const Header = () => {
               <>
                 <Typography
                   variant="body2"
-                  sx={{ display: { xs: "none", sm: "block" }, mr: 1 }}
+                  sx={{ 
+                    display: { xs: "none", sm: "block" }, 
+                    mr: 1,
+                  }}
                 >
                   Hola, {user?.firstName}
                 </Typography>
                 
+                {/* Panel Admin - MEJORADO PARA RESPONSIVE */}
                 {isAdmin && (
-                  <Button
-                    color="inherit"
-                    startIcon={<AdminPanelSettings />}
-                    onClick={() => navigate("/admin")}
-                    sx={{ display: { xs: "none", md: "flex" } }}
-                  >
-                    Panel Admin
-                  </Button>
+                  <>
+                    {/* Versión desktop - texto completo */}
+                    <Button
+                      color="inherit"
+                      startIcon={<AdminPanelSettings />}
+                      onClick={handleAdminPanel}
+                      sx={{ 
+                        display: { xs: "none", md: "flex" },
+                        minWidth: 'auto'
+                      }}
+                    >
+                      Panel Admin
+                    </Button>
+                    
+                    {/* Versión móvil - solo ícono */}
+                    <IconButton
+                      color="inherit"
+                      onClick={handleAdminPanel}
+                      sx={{ 
+                        display: { xs: "flex", md: "none" },
+                      }}
+                      title="Panel de Administración"
+                    >
+                      <AdminPanelSettings />
+                    </IconButton>
+                  </>
                 )}
 
-                <IconButton color="inherit" onClick={() => setIsCartOpen(true)}>
+                {/* Icono del carrito */}
+                <IconButton 
+                  color="inherit" 
+                  onClick={() => setIsCartOpen(true)}
+                  title="Ver carrito"
+                >
                   <Badge badgeContent={cartCount} color="secondary">
                     <ShoppingCart />
                   </Badge>
@@ -117,6 +153,14 @@ const Header = () => {
                     },
                   }}
                 >
+                  {isAdmin && (
+                    <MenuItem onClick={handleAdminPanel}>
+                      <ListItemIcon>
+                        <AdminPanelSettings fontSize="small" />
+                      </ListItemIcon>
+                      Panel Admin
+                    </MenuItem>
+                  )}
                   <MenuItem onClick={handleMyOrders}>
                     <ListItemIcon>
                       <Receipt fontSize="small" />
@@ -137,14 +181,19 @@ const Header = () => {
                   color="inherit"
                   startIcon={<Login />}
                   onClick={() => navigate("/login")}
+                  sx={{ fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
                 >
-                  Iniciar Sesión
+                  {isMobile ? "Login" : "Iniciar Sesión"}
                 </Button>
                 <Button
                   color="inherit"
                   variant="outlined"
+                  startIcon={<PersonAdd />}
                   onClick={() => navigate("/register")}
-                  sx={{ display: { xs: "none", sm: "block" } }}
+                  sx={{ 
+                    display: { xs: "none", sm: "flex" },
+                    fontSize: { xs: "0.8rem", sm: "0.9rem" }
+                  }}
                 >
                   Registrarse
                 </Button>

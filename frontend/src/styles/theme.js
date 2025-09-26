@@ -122,11 +122,10 @@ const theme = createTheme({
         root: {
           boxShadow: "0 2px 12px rgba(123, 31, 162, 0.15)",
           background: "linear-gradient(135deg, #7b1fa2 0%, #ab47bc 100%)",
-          borderRadius: "0px", // Eliminar bordes redondeados
+          borderRadius: "0px !important", // ✅ FORZAR SIN BORDES REDONDEADOS
         },
       },
     },
-
     MuiButton: {
       styleOverrides: {
         root: {

@@ -21,7 +21,7 @@ import CheckoutPage from "./pages/customer/CheckoutPage";
 import OrderConfirmationPage from "./pages/customer/OrderConfirmationPage";
 import OrderHistoryPage from "./pages/customer/OrderHistoryPage";
 import ExternalProductRequests from "./pages/admin/ExternalProductRequests";
-
+import CartPage from "./pages/customer/CartPage";
 function App() {
   return (
     <ThemeProvider theme={theme}>
@@ -37,6 +37,7 @@ function App() {
               <Route path="/tienda" element={<StorePage />} />
               <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/my-orders" element={<OrderHistoryPage />} />
+              <Route path="/cart" element={<CartPage />} />
               <Route
                 path="/order-confirmation/:orderId"
                 element={<OrderConfirmationPage />}

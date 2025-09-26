@@ -206,19 +206,46 @@ const CheckoutPage = () => {
         body: formData,
       });
 
+      // ✅ VERIFICACIÓN MÁS ROBUSTA DE LA RESPUESTA
+      const result = await response.json();
+      console.log(
+        "🔍 ESTRUCTURA COMPLETA DE LA RESPUESTA:",
+        JSON.stringify(result, null, 2)
+      );
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Error creando la transacción");
+        console.error("❌ Error del servidor:", response.status, result);
+        throw new Error(
+          result.message || `Error del servidor: ${response.status}`
+        );
       }
 
-      const transaction = await response.json();
-      console.log("✅ Transacción creada:", transaction);
+      // ✅ VERIFICAR ESTRUCTURA DE LA RESPUESTA
+      if (!result || !result.transaction) {
+        console.error("❌ Respuesta inesperada:", result);
+        throw new Error("La respuesta del servidor no es válida");
+      }
 
+      // ✅ OBTENER EL ID CORRECTAMENTE
+      const transactionId = result.transaction.id;
+
+      if (!transactionId) {
+        throw new Error("No se pudo obtener el ID de la transacción");
+      }
+
+      console.log("✅ ID de transacción encontrado:", transactionId);
+      console.log("🎯 Redirigiendo a orden:", transactionId);
+
+      // ✅ LIMPIAR CARRITO Y REDIRIGIR
       clearCart();
-      navigate(`/order-confirmation/${transaction.transaction.id}`);
+
+      // ✅ AGREGAR TIMEOUT PARA ASEGURAR LA NAVEGACIÓN
+      setTimeout(() => {
+        navigate(`/order-confirmation/${transactionId}`);
+      }, 100);
     } catch (error) {
       console.error("❌ Error submitting order:", error);
-      setError(error.message);
+      setError(error.message || "Error al procesar la orden");
     } finally {
       setLoading(false);
     }
@@ -824,7 +851,6 @@ const CheckoutPage = () => {
           </Grid>
         </Grid>
       )}
-      {/* ... (el resto del código del checkout permanece similar pero con las correcciones de precio) */}
     </Container>
   );
 };

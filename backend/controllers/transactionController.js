@@ -318,6 +318,60 @@ export const getAllTransactions = async (req, res) => {
   }
 };
 
+export const getTransactionById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    console.log("🔍 Buscando transacción ID:", id, "para usuario:", userId);
+
+    const transaction = await prisma.transaction.findFirst({
+      where: {
+        id: parseInt(id),
+        userId: userId, // Asegurar que el usuario solo vea sus propias transacciones
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+        orders: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!transaction) {
+      console.log("❌ Transacción no encontrada:", id);
+      return res.status(404).json({
+        message: "Transacción no encontrada o no tienes permisos para verla",
+      });
+    }
+
+    console.log("✅ Transacción encontrada:", transaction.id);
+    res.json({ transaction });
+  } catch (error) {
+    console.error("❌ Error obteniendo transacción:", error);
+    res.status(500).json({
+      message: "Error obteniendo transacción",
+      error: error.message,
+    });
+  }
+};
+
 // Actualizar estado de transacción (admin only)
 export const updateTransactionStatus = async (req, res) => {
   try {

@@ -15,51 +15,145 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemIcon,
+  CircularProgress,
 } from "@mui/material";
 import {
   CheckCircle,
   ShoppingBag,
-  Download,
-  Email,
   Home,
+  Receipt,
+  Error as ErrorIcon,
 } from "@mui/icons-material";
+import { useAuth } from "../../contexts/AuthContext";
 
 const OrderConfirmationPage = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Simular carga de orden (en una implementación real, harías una llamada API)
-    const timer = setTimeout(() => {
-      setOrder({
-        id: orderId,
-        status: "PENDING",
-        totalUSD: 45.99,
-        totalBS: 7821.83,
-        paymentMethod: "PAGO_MOVIL",
-        createdAt: new Date().toISOString(),
-        items: [
-          { product: { name: "Pulsera Elegante" }, quantity: 1, price: 25.99 },
-          { product: { name: "Dije Corazón" }, quantity: 2, price: 10.0 },
-        ],
-        transaction: {
-          reference: "1234567890",
-          senderName: "Juan Pérez",
+    loadOrderDetails();
+  }, [orderId]);
+
+  const loadOrderDetails = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const token = localStorage.getItem("token");
+
+      console.log("🔍 Cargando detalles de la orden ID:", orderId);
+
+      // Verifica que la URL sea correcta
+      const url = `http://localhost:5000/api/transactions/${orderId}`;
+      console.log("🌐 URL de la solicitud:", url);
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
       });
-      setLoading(false);
-    }, 1000);
 
-    return () => clearTimeout(timer);
-  }, [orderId]);
+      console.log(
+        "📊 Respuesta del servidor:",
+        response.status,
+        response.statusText
+      );
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log("✅ Datos de la orden recibidos:", data);
+
+      setOrder(data.transaction);
+    } catch (error) {
+      console.error("❌ Error cargando orden:", error);
+      setError("No se pudo cargar la orden: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusText = (status) => {
+    const statusMap = {
+      PENDING: "Pendiente de pago",
+      VERIFYING: "Verificando pago",
+      COMPLETED: "Completada",
+      CANCELLED: "Cancelada",
+    };
+    return statusMap[status] || status;
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "COMPLETED":
+        return "success";
+      case "PENDING":
+        return "warning";
+      case "VERIFYING":
+        return "info";
+      case "CANCELLED":
+        return "error";
+      default:
+        return "default";
+    }
+  };
+
+  const getPaymentMethodInfo = (method) => {
+    const methods = {
+      ZELLE: "Zelle Transfer",
+      PAGO_MOVIL: "Pago Móvil",
+      CRYPTO: "Criptomonedas",
+      ZINLI: "Zinli",
+      CASH_USD: "Efectivo USD",
+      CASH_BS: "Efectivo BS",
+    };
+    return methods[method] || method;
+  };
 
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4, textAlign: "center" }}>
-        <Typography variant="h6">Cargando confirmación...</Typography>
+        <CircularProgress size={60} />
+        <Typography variant="h6" sx={{ mt: 2 }}>
+          Cargando detalles de tu orden...
+        </Typography>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          <ErrorIcon />
+          <Typography variant="h6">Error al cargar la orden</Typography>
+          <Typography>{error}</Typography>
+        </Alert>
+        <Button
+          variant="contained"
+          onClick={() => navigate("/my-orders")}
+          startIcon={<Receipt />}
+        >
+          Ver Mis Órdenes
+        </Button>
+      </Container>
+    );
+  }
+
+  if (!order) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="warning">
+          <Typography variant="h6">Orden no encontrada</Typography>
+          <Typography>
+            La orden #{orderId} no existe o no tienes permisos para verla.
+          </Typography>
+        </Alert>
       </Container>
     );
   }
@@ -84,72 +178,104 @@ const OrderConfirmationPage = () => {
 
         <Alert severity="info" sx={{ mb: 4 }}>
           <Typography variant="body1">
-            <strong>Próximos pasos:</strong> Realiza el pago según las
-            instrucciones y sube el comprobante. Tu pedido será enviado una vez
-            confirmemos el pago.
+            <strong>Próximos pasos:</strong>{" "}
+            {order.status === "PENDING"
+              ? "Realiza el pago según las instrucciones y sube el comprobante."
+              : order.status === "VERIFYING"
+              ? "Tu pago está siendo verificado. Te notificaremos por correo electrónico."
+              : "Tu orden ha sido procesada exitosamente."}
           </Typography>
         </Alert>
 
         <Grid container spacing={4}>
-          {/* Detalles de la orden */}
+          {/* Información del Cliente */}
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  📦 Detalles de la Orden
+                  👤 Información del Cliente
                 </Typography>
                 <Divider sx={{ my: 2 }} />
+
                 <Box sx={{ mb: 2 }}>
                   <Typography>
-                    <strong>Fecha:</strong>{" "}
-                    {new Date(order.createdAt).toLocaleDateString("es-VE")}
+                    <strong>Nombre:</strong> {user?.firstName} {user?.lastName}
                   </Typography>
                   <Typography>
-                    <strong>Hora:</strong>{" "}
-                    {new Date(order.createdAt).toLocaleTimeString("es-VE")}
+                    <strong>Email:</strong> {user?.email}
                   </Typography>
-                  <Typography>
-                    <strong>Estado:</strong>
-                    <Chip
-                      label={order.status}
-                      color={
-                        order.status === "COMPLETED" ? "success" : "warning"
-                      }
-                      size="small"
-                      sx={{ ml: 1 }}
-                    />
-                  </Typography>
+                  {user?.phone && (
+                    <Typography>
+                      <strong>Teléfono:</strong> {user.phone}
+                    </Typography>
+                  )}
                 </Box>
+
                 <Typography variant="subtitle1" gutterBottom>
-                  📋 Resumen de Pago:
+                  📋 Detalles de la Transacción
                 </Typography>
                 <Typography>
-                  <strong>Método:</strong> {order.paymentMethod}
+                  <strong>Fecha:</strong>{" "}
+                  {new Date(order.createdAt).toLocaleDateString("es-VE")}
                 </Typography>
                 <Typography>
-                  <strong>Total USD:</strong> ${order.totalUSD.toFixed(2)}
+                  <strong>Hora:</strong>{" "}
+                  {new Date(order.createdAt).toLocaleTimeString("es-VE")}
                 </Typography>
-                {order.totalBS && (
+                <Typography>
+                  <strong>Estado:</strong>
+                  <Chip
+                    label={getStatusText(order.status)}
+                    color={getStatusColor(order.status)}
+                    size="small"
+                    sx={{ ml: 1 }}
+                  />
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Detalles de Pago */}
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  💳 Información de Pago
+                </Typography>
+                <Divider sx={{ my: 2 }} />
+
+                <Box sx={{ mb: 2 }}>
                   <Typography>
-                    <strong>Total BS:</strong> {order.totalBS.toFixed(2)}
+                    <strong>Método de pago:</strong>{" "}
+                    {getPaymentMethodInfo(order.paymentMethod)}
                   </Typography>
-                )}
-                {order.transaction?.reference && (
                   <Typography>
-                    <strong>Referencia:</strong> {order.transaction.reference}
+                    <strong>Monto USD:</strong> ${order.amountUSD?.toFixed(2)}
                   </Typography>
-                )}
-                {order.transaction?.senderName && (
-                  <Typography>
-                    <strong>Remitente:</strong> {order.transaction.senderName}
-                  </Typography>
-                )}
-                {order.exchangeRate && (
-                  <Typography>
-                    <strong>Tasa de cambio:</strong> {order.exchangeRate} BS/USD
-                  </Typography>
-                )}
-                // En los detalles de pago
+                  {order.amountBS && (
+                    <Typography>
+                      <strong>Monto BS:</strong> Bs. {order.amountBS.toFixed(2)}
+                    </Typography>
+                  )}
+                  {order.exchangeRate && (
+                    <Typography>
+                      <strong>Tasa de cambio:</strong> {order.exchangeRate}{" "}
+                      BS/USD
+                    </Typography>
+                  )}
+                  {order.reference && (
+                    <Typography>
+                      <strong>Referencia:</strong> {order.reference}
+                    </Typography>
+                  )}
+                  {order.senderName && (
+                    <Typography>
+                      <strong>Remitente:</strong> {order.senderName}
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* Mensaje de ahorro para métodos USD */}
                 {order.paymentMethod &&
                   ["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(
                     order.paymentMethod
@@ -171,92 +297,119 @@ const OrderConfirmationPage = () => {
               </CardContent>
             </Card>
           </Grid>
-
-          {/* Productos */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  🎀 Productos en tu Orden
-                </Typography>
-                <Divider sx={{ my: 2 }} />
-
-                <List>
-                  {order.items.map((item, index) => (
-                    <ListItem key={index} divider>
-                      <ListItemText
-                        primary={item.product.name}
-                        secondary={
-                          <Typography variant="body2">
-                            Cantidad: {item.quantity} × ${item.price} = $
-                            {(item.quantity * item.price).toFixed(2)}
-                          </Typography>
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-
-                <Box
-                  sx={{
-                    mt: 2,
-                    p: 2,
-                    bgcolor: "background.default",
-                    borderRadius: 1,
-                  }}
-                >
-                  <Typography variant="h6" align="right">
-                    Total: ${order.totalUSD.toFixed(2)}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
         </Grid>
 
-        {/* Instrucciones de pago */}
-        <Card sx={{ mt: 4 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              💳 Instrucciones para Completar el Pago
-            </Typography>
-            <Divider sx={{ my: 2 }} />
-
-            <Box component="ol" sx={{ pl: 3 }}>
-              <li>
-                <Typography variant="body1" gutterBottom>
-                  <strong>Realiza el pago</strong> usando el método seleccionado
-                  ({order.paymentMethod})
-                </Typography>
-              </li>
-              <li>
-                <Typography variant="body1" gutterBottom>
-                  <strong>Guarda el comprobante</strong> de pago (captura de
-                  pantalla o foto)
-                </Typography>
-              </li>
-              <li>
-                <Typography variant="body1" gutterBottom>
-                  <strong>Sube el comprobante</strong> en la sección "Mis
-                  Órdenes" de tu perfil
-                </Typography>
-              </li>
-              <li>
-                <Typography variant="body1">
-                  <strong>Espera la confirmación</strong> por correo electrónico
-                  (1-2 horas)
-                </Typography>
-              </li>
-            </Box>
-
-            <Alert severity="warning" sx={{ mt: 2 }}>
-              <Typography variant="body2">
-                <strong>Importante:</strong> Tu pedido será procesado solo
-                después de confirmar el pago.
+        {/* Productos Comprados */}
+        {order.orders && order.orders.length > 0 && (
+          <Card sx={{ mt: 4 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                🎀 Productos en tu Orden
               </Typography>
-            </Alert>
-          </CardContent>
-        </Card>
+              <Divider sx={{ my: 2 }} />
+
+              {order.orders.map((orderItem, index) => (
+                <Box key={index}>
+                  {orderItem.items &&
+                  Array.isArray(orderItem.items) &&
+                  orderItem.items.length > 0 ? (
+                    <List>
+                      {orderItem.items.map((item, itemIndex) => (
+                        <ListItem key={itemIndex} divider>
+                          <ListItemText
+                            primary={item.productName || "Producto"}
+                            secondary={
+                              <Box>
+                                <Typography variant="body2">
+                                  Cantidad: {item.quantity} × $
+                                  {item.price?.toFixed(2)} = $
+                                  {(item.quantity * item.price).toFixed(2)}
+                                </Typography>
+                                {item.customization && (
+                                  <Typography
+                                    variant="body2"
+                                    color="textSecondary"
+                                  >
+                                    Personalización:{" "}
+                                    {item.customization.material},{" "}
+                                    {item.customization.color}
+                                  </Typography>
+                                )}
+                              </Box>
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      No hay información detallada de productos disponible.
+                    </Typography>
+                  )}
+
+                  <Box
+                    sx={{
+                      mt: 2,
+                      p: 2,
+                      bgcolor: "background.default",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography variant="h6" align="right">
+                      Total: ${orderItem.totalUSD?.toFixed(2) || "0.00"}
+                    </Typography>
+                  </Box>
+                </Box>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Instrucciones de Pago (solo para órdenes pendientes) */}
+        {order.status === "PENDING" && (
+          <Card sx={{ mt: 4 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                📝 Instrucciones para Completar el Pago
+              </Typography>
+              <Divider sx={{ my: 2 }} />
+
+              <Box component="ol" sx={{ pl: 3 }}>
+                <li>
+                  <Typography variant="body1" gutterBottom>
+                    <strong>Realiza el pago</strong> usando{" "}
+                    {getPaymentMethodInfo(order.paymentMethod)}
+                  </Typography>
+                </li>
+                <li>
+                  <Typography variant="body1" gutterBottom>
+                    <strong>Guarda el comprobante</strong> de pago (captura de
+                    pantalla o foto)
+                  </Typography>
+                </li>
+                <li>
+                  <Typography variant="body1" gutterBottom>
+                    <strong>Sube el comprobante</strong> en la sección "Mis
+                    Órdenes" de tu perfil
+                  </Typography>
+                </li>
+                <li>
+                  <Typography variant="body1">
+                    <strong>Espera la confirmación</strong> por correo
+                    electrónico (1-2 horas)
+                  </Typography>
+                </li>
+              </Box>
+
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                <Typography variant="body2">
+                  <strong>Importante:</strong> Tu pedido será procesado solo
+                  después de confirmar el pago.
+                </Typography>
+              </Alert>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Acciones */}
         <Box
@@ -276,6 +429,15 @@ const OrderConfirmationPage = () => {
           >
             Seguir Comprando
           </Button>
+
+          <Button
+            variant="outlined"
+            startIcon={<Receipt />}
+            onClick={() => navigate("/my-orders")}
+          >
+            Ver Mis Órdenes
+          </Button>
+
           <Button
             variant="outlined"
             startIcon={<Home />}
@@ -283,19 +445,11 @@ const OrderConfirmationPage = () => {
           >
             Ir al Inicio
           </Button>
-          <Button
-            variant="outlined"
-            startIcon={<Email />}
-            onClick={() => window.print()}
-          >
-            Imprimir Comprobante
-          </Button>
         </Box>
 
         <Box sx={{ mt: 4, textAlign: "center" }}>
           <Typography variant="body2" color="textSecondary">
-            ¿Tienes preguntas? <Link to="/contact">Contáctanos</Link> o escribe
-            a support@creacionesroxo.com
+            ¿Tienes preguntas? Contáctanos en support@creacionesroxo.com
           </Typography>
         </Box>
       </Paper>
