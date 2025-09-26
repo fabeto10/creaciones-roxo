@@ -158,15 +158,6 @@ const theme = createTheme({
       },
     },
 
-    MuiAppBar: {
-      styleOverrides: {
-        root: {
-          boxShadow: "0 2px 12px rgba(0,0,0,0.1)",
-          background: "linear-gradient(135deg, #e91e63 0%, #9c27b0 100%)",
-        },
-      },
-    },
-
     MuiTextField: {
       styleOverrides: {
         root: {

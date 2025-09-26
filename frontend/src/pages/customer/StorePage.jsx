@@ -18,6 +18,7 @@ import {
 import { FilterList, Search, Tune } from "@mui/icons-material";
 import { productsAPI } from "../../services/products";
 import ProductCard from "../../components/products/ProductCard";
+import { useCart } from "../../contexts/CartContext";
 
 const StorePage = () => {
   const [products, setProducts] = useState([]);
@@ -28,27 +29,24 @@ const StorePage = () => {
   const [sortBy, setSortBy] = useState("name");
   const [currentPage, setCurrentPage] = useState(1);
   const [filterOpen, setFilterOpen] = useState(false);
+  const { syncCartWithStock } = useCart();
   const productsPerPage = 9;
 
   useEffect(() => {
     loadProducts();
   }, []);
 
+  // En StorePage.jsx, modifica el filtro:
+
   const loadProducts = async () => {
     try {
       setLoading(true);
       const response = await productsAPI.getProducts();
+      // MOSTRAR TODOS los productos activos, incluso agotados
       const activeProducts = response.data.filter((p) => p.isActive);
-
-      // DEBUG: Verificar imágenes
-      activeProducts.forEach((product) => {
-        console.log(`📊 ${product.name}:`, {
-          images: product.images,
-          imageCount: product.images?.length || 0,
-          firstImage: product.images?.[0],
-        });
-      });
-
+      if (syncCartWithStock) {
+        syncCartWithStock(activeProducts);
+      }
       setProducts(activeProducts);
     } catch (error) {
       console.error("Error loading products:", error);

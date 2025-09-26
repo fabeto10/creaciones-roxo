@@ -8,25 +8,59 @@ export const calculatePayment = async (req, res) => {
 
     if (!amountUSD || !method) {
       return res.status(400).json({
-        message: "Amount USD and payment method are required",
+        message: "Faltan campos requeridos: amountUSD, method",
       });
     }
 
-    const result = await ExchangeRateService.calculatePriceInBolivares(
-      parseFloat(amountUSD),
-      method
-    );
-    const methodInfo = ExchangeRateService.getPaymentMethodInfo(method);
+    // Obtener tasas de cambio (puedes usar una API o valores fijos)
+    const exchangeRates = {
+      official: 173.74, // Tasa BCV
+      parallel: 292.47, // Tasa paralela
+    };
 
-    res.json({
-      ...result,
-      methodInfo,
-    });
+    let responseData = {};
+
+    if (["ZELLE", "CRYPTO", "ZINLI", "CASH_USD"].includes(method)) {
+      // Calcular descuento para métodos USD
+      const discountPercentage = Math.min(
+        Math.max(
+          ((exchangeRates.parallel - exchangeRates.official) /
+            exchangeRates.parallel) *
+            100,
+          35
+        ),
+        45
+      );
+
+      const discountedAmountUSD = amountUSD * (1 - discountPercentage / 100);
+      const amountBSOfficial = discountedAmountUSD * exchangeRates.official;
+      const amountBSParallel = amountUSD * exchangeRates.parallel;
+
+      responseData = {
+        amountBS: amountBSOfficial,
+        rate: exchangeRates.official,
+        savings: {
+          amountBSParallel,
+          amountBSOfficial,
+          savingsPercentage: discountPercentage.toFixed(1),
+          savingsAmountBS: amountBSParallel - amountBSOfficial,
+          savingsAmountUSD: amountUSD - discountedAmountUSD,
+        },
+      };
+    } else {
+      // Para métodos BS, usar tasa oficial
+      responseData = {
+        amountBS: amountUSD * exchangeRates.official,
+        rate: exchangeRates.official,
+      };
+    }
+
+    res.json(responseData);
   } catch (error) {
-    console.error("Error calculating payment:", error);
+    console.error("❌ Error en calculate payment:", error);
     res
       .status(500)
-      .json({ message: "Error calculating payment", error: error.message });
+      .json({ message: "Error calculando pago", error: error.message });
   }
 };
 

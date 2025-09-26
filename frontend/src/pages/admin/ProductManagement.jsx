@@ -25,6 +25,7 @@ import {
   Grid,
   Card,
   CardContent,
+  Divider, // ← AGREGAR ESTO
 } from "@mui/material";
 import {
   Add,
@@ -34,6 +35,7 @@ import {
   Inventory2,
   CloudUpload,
   Delete as DeleteIcon,
+  Close, // ← AGREGAR ESTO
 } from "@mui/icons-material";
 import { productsAPI } from "../../services/products";
 import { charmsAPI } from "../../services/charms";
@@ -223,6 +225,28 @@ const ProductManagement = () => {
         formData.isActive === true || formData.isActive === "true"
       );
 
+      // ✅ CORREGIDO: Enviar imágenes existentes al backend
+      if (editingProduct) {
+        // Para edición, enviar las imágenes que quedaron después de las eliminaciones
+        const remainingExistingImages = imagePreviews
+          .filter((preview, index) => {
+            // Solo incluir imágenes que son existentes (no nuevas)
+            return index < imagePreviews.length - selectedImages.length;
+          })
+          .map((preview) => {
+            // Convertir de URL de preview a ruta relativa para el backend
+            if (preview.startsWith("http://localhost:5000")) {
+              return preview.replace("http://localhost:5000", "");
+            }
+            return preview;
+          });
+
+        submitData.append(
+          "existingImages",
+          JSON.stringify(remainingExistingImages)
+        );
+      }
+
       // Campos JSON - validar y parsear
       try {
         if (formData.tags) {
@@ -263,6 +287,7 @@ const ProductManagement = () => {
       console.log("🔄 Enviando datos del producto...", {
         formData,
         selectedImagesCount: selectedImages.length,
+        existingImagesCount: imagePreviews.length - selectedImages.length,
       });
 
       if (editingProduct) {
@@ -783,101 +808,291 @@ const ProductManagement = () => {
       <Dialog
         open={detailDialogOpen}
         onClose={() => setDetailDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
+        PaperProps={{
+          sx: {
+            maxHeight: "90vh",
+          },
+        }}
       >
         <DialogTitle>
-          Detalles del Producto - {viewingProduct?.name}
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Typography variant="h6">
+              Detalles del Producto - {viewingProduct?.name}
+            </Typography>
+            <IconButton onClick={() => setDetailDialogOpen(false)} size="small">
+              <Close />
+            </IconButton>
+          </Box>
         </DialogTitle>
+
         <DialogContent>
           {viewingProduct && (
-            <Grid container spacing={3} sx={{ mt: 1 }}>
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>
-                  Información Básica
-                </Typography>
-                <Typography>
-                  <strong>Nombre:</strong> {viewingProduct.name}
-                </Typography>
-                <Typography>
-                  <strong>Descripción:</strong> {viewingProduct.description}
-                </Typography>
-                <Typography>
-                  <strong>Tipo:</strong> {viewingProduct.type}
-                </Typography>
-                <Typography>
-                  <strong>Categoría:</strong> {viewingProduct.category}
-                </Typography>
-                <Typography>
-                  <strong>Precio Base:</strong> ${viewingProduct.basePrice}
-                </Typography>
-                <Typography>
-                  <strong>Stock:</strong> {viewingProduct.stock}
-                </Typography>
-                <Typography>
-                  <strong>Personalizable:</strong>{" "}
-                  {viewingProduct.customizable ? "Sí" : "No"}
-                </Typography>
+            <Box sx={{ mt: 1 }}>
+              <Grid container spacing={3}>
+                {/* Galería de imágenes MEJORADA con carrusel */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    🖼️ Imágenes del Producto
+                  </Typography>
+                  {viewingProduct.images && viewingProduct.images.length > 0 ? (
+                    <Box>
+                      {/* Imagen principal */}
+                      <Box
+                        sx={{
+                          position: "relative",
+                          textAlign: "center",
+                          mb: 2,
+                        }}
+                      >
+                        <img
+                          src={
+                            viewingProduct.images[0].startsWith("http")
+                              ? viewingProduct.images[0]
+                              : `http://localhost:5000${viewingProduct.images[0]}`
+                          }
+                          alt={viewingProduct.name}
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: 300,
+                            objectFit: "contain",
+                            borderRadius: 8,
+                            cursor: "pointer",
+                          }}
+                          onClick={() =>
+                            window.open(
+                              viewingProduct.images[0].startsWith("http")
+                                ? viewingProduct.images[0]
+                                : `http://localhost:5000${viewingProduct.images[0]}`,
+                              "_blank"
+                            )
+                          }
+                        />
+                      </Box>
 
-                <Typography>
-                  <strong>Estado:</strong>{" "}
-                  {viewingProduct.isActive ? "Activo" : "Inactivo"}
-                </Typography>
-              </Grid>
+                      {/* Miniaturas */}
+                      {viewingProduct.images.length > 1 && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 1,
+                            flexWrap: "wrap",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {viewingProduct.images.map((img, index) => {
+                            const imageUrl = img.startsWith("http")
+                              ? img
+                              : `http://localhost:5000${img}`;
 
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>
-                  Imágenes del Producto
-                </Typography>
-                {viewingProduct.images && viewingProduct.images.length > 0 ? (
-                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                    {viewingProduct.images.map((img, index) => (
+                            return (
+                              <Box
+                                key={index}
+                                sx={{
+                                  position: "relative",
+                                  cursor: "pointer",
+                                  "&:hover": { transform: "scale(1.05)" },
+                                  transition: "transform 0.2s",
+                                }}
+                                onClick={() => window.open(imageUrl, "_blank")}
+                                title="Haz clic para ver la imagen en tamaño completo"
+                              >
+                                <img
+                                  src={imageUrl}
+                                  alt={`${viewingProduct.name} ${index + 1}`}
+                                  style={{
+                                    width: 80,
+                                    height: 80,
+                                    objectFit: "cover",
+                                    borderRadius: 4,
+                                    border: "2px solid #e0e0e0",
+                                  }}
+                                  onError={(e) => {
+                                    e.target.src =
+                                      "/images/placeholder-bracelet.jpg";
+                                  }}
+                                />
+                                <Chip
+                                  label={`${index + 1}`}
+                                  size="small"
+                                  sx={{
+                                    position: "absolute",
+                                    top: -8,
+                                    right: -8,
+                                    bgcolor: "primary.main",
+                                    color: "white",
+                                    fontSize: "0.7rem",
+                                    height: 20,
+                                    minWidth: 20,
+                                  }}
+                                />
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      )}
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        sx={{ mt: 1, display: "block" }}
+                      >
+                        {viewingProduct.images.length} imagen(es) - Clic en
+                        cualquier imagen para ampliar
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Box sx={{ textAlign: "center", py: 4 }}>
                       <img
-                        key={index}
-                        src={
-                          img.startsWith("http")
-                            ? img
-                            : `http://localhost:5000${img}`
-                        }
-                        alt={`${viewingProduct.name} ${index + 1}`}
+                        src="/images/placeholder-bracelet.jpg"
+                        alt="Sin imágenes"
                         style={{
-                          width: 80,
-                          height: 80,
+                          width: 150,
+                          height: 150,
                           objectFit: "cover",
                           borderRadius: 8,
+                          opacity: 0.5,
                         }}
                       />
-                    ))}
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="textSecondary">
-                    No hay imágenes disponibles
-                  </Typography>
-                )}
-              </Grid>
-
-              {viewingProduct.tags && viewingProduct.tags.length > 0 && (
-                <Grid item xs={12}>
-                  <Typography variant="h6" gutterBottom>
-                    Etiquetas
-                  </Typography>
-                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                    {viewingProduct.tags.map((tag, index) => (
-                      <Chip key={index} label={tag} size="small" />
-                    ))}
-                  </Box>
+                      <Typography
+                        variant="body2"
+                        color="textSecondary"
+                        sx={{ mt: 1 }}
+                      >
+                        No hay imágenes disponibles para este producto
+                      </Typography>
+                    </Box>
+                  )}
                 </Grid>
-              )}
-            </Grid>
+
+                {/* Información del producto */}
+                <Grid item xs={12} md={6}>
+                  <Card variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="h6" gutterBottom color="primary">
+                      📋 Información del Producto
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+
+                    <Grid container spacing={1}>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Nombre:
+                        </Typography>
+                        <Typography variant="body2" fontWeight="bold">
+                          {viewingProduct.name}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Tipo:
+                        </Typography>
+                        <Chip
+                          label={viewingProduct.type}
+                          size="small"
+                          color="primary"
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Precio:
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight="bold"
+                          color="success.main"
+                        >
+                          ${viewingProduct.basePrice}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Stock:
+                        </Typography>
+                        <Typography variant="body2" fontWeight="bold">
+                          {viewingProduct.stock}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Categoría:
+                        </Typography>
+                        <Typography variant="body2">
+                          {viewingProduct.category}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Estado:
+                        </Typography>
+                        <Chip
+                          label={
+                            viewingProduct.isActive ? "Activo" : "Inactivo"
+                          }
+                          size="small"
+                          color={
+                            viewingProduct.isActive ? "success" : "default"
+                          }
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Personalizable:
+                        </Typography>
+                        <Chip
+                          label={viewingProduct.customizable ? "Sí" : "No"}
+                          size="small"
+                          color={
+                            viewingProduct.customizable ? "info" : "default"
+                          }
+                        />
+                      </Grid>
+                    </Grid>
+
+                    <Typography variant="body2" sx={{ mt: 2 }}>
+                      <strong>Descripción:</strong> {viewingProduct.description}
+                    </Typography>
+
+                    {viewingProduct.tags && viewingProduct.tags.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="body2" color="textSecondary">
+                          Etiquetas:
+                        </Typography>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 0.5,
+                            mt: 0.5,
+                          }}
+                        >
+                          {viewingProduct.tags.map((tag, index) => (
+                            <Chip
+                              key={index}
+                              label={tag}
+                              size="small"
+                              variant="outlined"
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+                  </Card>
+                </Grid>
+              </Grid>
+            </Box>
           )}
         </DialogContent>
+
         <DialogActions>
           <Button
             variant="contained"
             onClick={() => {
               setDetailDialogOpen(false);
-              // Opcional: redirigir a la tienda donde está el producto
-              // navigate(`/tienda?product=${viewingProduct.id}`);
+              // Aquí puedes agregar navegación a la tienda si es necesario
             }}
           >
             Ver en Tienda

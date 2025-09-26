@@ -79,6 +79,23 @@ const CheckoutPage = () => {
 
     if (cartItems.length === 0) {
       navigate("/tienda");
+      return;
+    }
+
+    // ✅ VALIDAR STOCK AL CARGAR LA PÁGINA
+    const stockErrors = cartItems.filter(
+      (item) => item.product.stock < item.quantity
+    );
+    if (stockErrors.length > 0) {
+      const errorMessage = `Algunos productos no tienen suficiente stock:\n${stockErrors
+        .map(
+          (error) =>
+            `- ${error.product.name}: Solicitados ${error.quantity}, Disponibles ${error.product.stock}`
+        )
+        .join("\n")}`;
+
+      alert(errorMessage);
+      navigate("/cart");
     }
   }, [isAuthenticated, cartItems, navigate]);
 
@@ -102,15 +119,16 @@ const CheckoutPage = () => {
         }
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        setExchangeInfo(data);
-      } else {
-        throw new Error("Error calculando tasa de cambio");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error calculando tasa de cambio");
       }
+
+      const data = await response.json();
+      setExchangeInfo(data);
     } catch (error) {
-      console.error("Error calculating exchange:", error);
-      setError("Error al calcular la tasa de cambio");
+      console.error("❌ Error calculating exchange:", error);
+      setError("Error al calcular la tasa de cambio: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -156,6 +174,22 @@ const CheckoutPage = () => {
   };
 
   const handleSubmitOrder = async () => {
+    // ✅ VALIDAR STOCK ANTES DE ENVIAR
+    const stockErrors = cartItems.filter(
+      (item) => item.product.stock < item.quantity
+    );
+    if (stockErrors.length > 0) {
+      const errorMessage = `No se puede procesar el pedido. Stock insuficiente:\n${stockErrors
+        .map(
+          (error) =>
+            `- ${error.product.name}: Solicitados ${error.quantity}, Disponibles ${error.product.stock}`
+        )
+        .join("\n")}`;
+
+      setError(errorMessage);
+      return;
+    }
+
     setLoading(true);
     setError("");
 

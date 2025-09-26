@@ -31,11 +31,12 @@ const ProductCard = ({ product }) => {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [images, setImages] = useState([]);
-  const { addToCart, calculatePriceInfo } = useCart();
+  const { addToCart, calculatePriceInfo, canAddToCart } = useCart();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const priceInfo = calculatePriceInfo(product.basePrice);
+  const isOutOfStock = product.stock <= 0;
 
   // Procesar imágenes una vez cuando el componente se monta o el producto cambia
   useEffect(() => {
@@ -102,6 +103,26 @@ const ProductCard = ({ product }) => {
       return;
     }
 
+    if (canAddToCart) {
+      const validation = canAddToCart(product);
+
+      if (!validation.canAdd) {
+        switch (validation.reason) {
+          case "AGOTADO":
+            alert("❌ Este producto está agotado");
+            break;
+          case "STOCK_INSUFICIENTE":
+            alert(
+              `⚠️ No hay suficiente stock. Solo quedan ${validation.available} unidades.`
+            );
+            break;
+          default:
+            alert("❌ No se puede agregar este producto al carrito");
+        }
+        return;
+      }
+    }
+
     if (product.customizable) {
       setCustomizerOpen(true);
     } else {
@@ -143,46 +164,63 @@ const ProductCard = ({ product }) => {
           flexDirection: "column",
           transition: "transform 0.3s ease, box-shadow 0.3s ease",
           "&:hover": {
-            transform: "translateY(-4px)",
-            boxShadow: "0 8px 32px rgba(233, 30, 99, 0.15)",
+            transform: isOutOfStock ? "none" : "translateY(-4px)",
+            boxShadow: isOutOfStock
+              ? "none"
+              : "0 8px 32px rgba(233, 30, 99, 0.15)",
           },
+          opacity: isOutOfStock ? 0.7 : 1,
+          position: "relative",
         }}
       >
+        {/* Badge de AGOTADO */}
+        {isOutOfStock && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 8,
+              left: 8,
+              zIndex: 2,
+            }}
+          >
+            <Chip
+              label="AGOTADO"
+              color="error"
+              size="small"
+              sx={{
+                fontWeight: "bold",
+                fontSize: "0.7rem",
+              }}
+            />
+          </Box>
+        )}
+
         {/* Imagen del producto */}
         <Box
           sx={{
             position: "relative",
             width: "100%",
             height: 250,
-            cursor: "pointer",
+            cursor: isOutOfStock ? "default" : "pointer",
             overflow: "hidden",
             backgroundColor: "grey.100",
           }}
-          onClick={() => openImageDialog(0)}
+          onClick={isOutOfStock ? undefined : () => openImageDialog(0)}
         >
           <img
-            src={images[0]} // Usar imágenes[0] directamente
+            src={images[0]}
             alt={product.name}
             style={{
               width: "100%",
               height: "100%",
               objectFit: "cover",
+              filter: isOutOfStock ? "grayscale(30%)" : "none",
             }}
             onError={(e) => {
               console.error("Error cargando imagen principal:", images[0]);
-              e.target.src = "/images/placeholder-bracelet.jpg"; // Verifica que esta ruta sea correcta
+              e.target.src = "/images/placeholder-bracelet.jpg";
             }}
           />
-          {/* <ImageWithFallback
-            src={images[0]}
-            alt={product.name}
-            fallbackSrc="/images/placeholder-bracelet.jpg"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-          /> */}
           {images.length > 1 && (
             <Chip
               label={`${images.length} imágenes`}
@@ -202,7 +240,6 @@ const ProductCard = ({ product }) => {
         <CardContent
           sx={{ flexGrow: 1, display: "flex", flexDirection: "column", p: 2 }}
         >
-          {/* ... (el resto del contenido de la tarjeta permanece igual) */}
           <Box sx={{ flexGrow: 1 }}>
             <Typography variant="h6" gutterBottom fontWeight="600">
               {product.name}
@@ -222,6 +259,19 @@ const ProductCard = ({ product }) => {
               {product.description}
             </Typography>
 
+            {/* Indicador de stock */}
+            <Box sx={{ mb: 1 }}>
+              <Typography
+                variant="caption"
+                color={isOutOfStock ? "error" : "success"}
+                fontWeight="bold"
+              >
+                {isOutOfStock
+                  ? "🛑 AGOTADO"
+                  : `📦 Stock: ${product.stock} disponibles`}
+              </Typography>
+            </Box>
+
             {/* Tags */}
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 1 }}>
               {product.tags?.map((tag, index) => (
@@ -234,9 +284,10 @@ const ProductCard = ({ product }) => {
             {/* PRECIO PRINCIPAL EN BS */}
             <Typography
               variant="h5"
-              color="primary"
+              color={isOutOfStock ? "text.secondary" : "primary"}
               gutterBottom
               fontWeight="600"
+              sx={{ textDecoration: isOutOfStock ? "line-through" : "none" }}
             >
               {priceInfo.priceBS.toFixed(2)} BS
             </Typography>
@@ -246,51 +297,53 @@ const ProductCard = ({ product }) => {
               Precio original: ${priceInfo.originalPriceUSD.toFixed(2)} USD
             </Typography>
 
-            {/* PRECIO CON DESCUENTO EN USD */}
-            <Box
-              sx={{
-                bgcolor: "success.light",
-                p: 1,
-                borderRadius: 1,
-                mb: 1,
-                border: "1px solid",
-                borderColor: "success.main",
-              }}
-            >
-              <Box display="flex" alignItems="center" gap={0.5} mb={0.5}>
-                <Savings color="success" fontSize="small" />
-                <Typography
-                  variant="subtitle2"
-                  color="success.dark"
-                  fontWeight="bold"
-                >
-                  ¡Paga en USD y ahorra {priceInfo.discount.percentage}%!
-                </Typography>
-              </Box>
-
+            {/* PRECIO CON DESCUENTO EN USD - SOLO SI NO ESTÁ AGOTADO */}
+            {!isOutOfStock && (
               <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
+                sx={{
+                  bgcolor: "success.light",
+                  p: 1,
+                  borderRadius: 1,
+                  mb: 1,
+                  border: "1px solid",
+                  borderColor: "success.main",
+                }}
               >
-                <Box display="flex" alignItems="baseline" gap={0.5}>
-                  <PriceCheck color="success" fontSize="small" />
+                <Box display="flex" alignItems="center" gap={0.5} mb={0.5}>
+                  <Savings color="success" fontSize="small" />
                   <Typography
-                    variant="h6"
+                    variant="subtitle2"
                     color="success.dark"
                     fontWeight="bold"
                   >
-                    ${priceInfo.discountedPriceUSD.toFixed(2)} USD
+                    ¡Paga en USD y ahorra {priceInfo.discount.percentage}%!
                   </Typography>
                 </Box>
-                <Chip
-                  label={`-${priceInfo.discount.percentage}%`}
-                  size="small"
-                  color="success"
-                  variant="filled"
-                />
+
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
+                  <Box display="flex" alignItems="baseline" gap={0.5}>
+                    <PriceCheck color="success" fontSize="small" />
+                    <Typography
+                      variant="h6"
+                      color="success.dark"
+                      fontWeight="bold"
+                    >
+                      ${priceInfo.discountedPriceUSD.toFixed(2)} USD
+                    </Typography>
+                  </Box>
+                  <Chip
+                    label={`-${priceInfo.discount.percentage}%`}
+                    size="small"
+                    color="success"
+                    variant="filled"
+                  />
+                </Box>
               </Box>
-            </Box>
+            )}
 
             {/* INFORMACIÓN ADICIONAL */}
             <Typography variant="caption" color="textSecondary" display="block">
@@ -306,16 +359,26 @@ const ProductCard = ({ product }) => {
               startIcon={product.customizable ? <Build /> : <ShoppingCart />}
               onClick={handleAddToCart}
               size="medium"
+              disabled={isOutOfStock} // Solo deshabilitar si está agotado
               sx={{
-                background: "linear-gradient(135deg, #e91e63 0%, #9c27b0 100%)",
-                "&:hover": {
-                  background:
-                    "linear-gradient(135deg, #c2185b 0%, #7b1fa2 100%)",
-                },
+                background: isOutOfStock
+                  ? "grey.400"
+                  : "linear-gradient(135deg, #e91e63 0%, #9c27b0 100%)",
+                "&:hover": isOutOfStock
+                  ? {}
+                  : {
+                      background:
+                        "linear-gradient(135deg, #c2185b 0%, #7b1fa2 100%)",
+                    },
                 mt: 1,
+                cursor: isOutOfStock ? "not-allowed" : "pointer",
               }}
             >
-              {product.customizable ? "Personalizar" : "Agregar al Carrito"}
+              {isOutOfStock
+                ? "PRODUCTO AGOTADO"
+                : product.customizable
+                ? "Personalizar"
+                : "Agregar al Carrito"}
             </Button>
           </Box>
         </CardContent>

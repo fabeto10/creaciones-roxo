@@ -13,6 +13,7 @@ import { screenshotUpload } from '../middleware/upload.js';
 
 const router = express.Router();
 
+
 // Ruta pública para calcular pagos
 router.post('/payments/calculate', calculatePayment);
 
