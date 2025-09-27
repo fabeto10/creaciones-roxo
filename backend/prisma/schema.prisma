@@ -22,6 +22,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   transactions Transaction[]
+  cart      Cart? 
 
   designs Design[]
   orders  Order[]
@@ -185,4 +186,16 @@ model ExternalProductRequest {
   updatedAt   DateTime @updatedAt
 
   @@map("external_product_requests")
+}
+
+
+model Cart {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique // Relación uno-a-uno: un usuario tiene un carrito
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     Json     // Almacenará los items del carrito como un array de JSON
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("carts")
 }

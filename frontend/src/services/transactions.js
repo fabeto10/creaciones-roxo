@@ -8,6 +8,7 @@ export const transactionsAPI = {
     }
   }),
   getTransaction: (id) => api.get(`/transactions/${id}`),
+  getTransactionById: (id) => api.get(`/transactions/${id}`), // ← ALIAS para claridad
   getUserTransactions: () => api.get('/transactions/my-transactions'),
   uploadScreenshot: (id, formData) => api.post(`/transactions/${id}/screenshot`, formData, {
     headers: {

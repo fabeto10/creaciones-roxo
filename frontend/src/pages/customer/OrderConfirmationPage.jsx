@@ -35,41 +35,54 @@ const OrderConfirmationPage = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadOrderDetails();
+    if (orderId) {
+      loadOrderDetails();
+    }
   }, [orderId]);
-
   const loadOrderDetails = async () => {
     try {
       setLoading(true);
       setError(null);
+
+      console.log("🔍 Cargando orden ID:", orderId);
+
       const token = localStorage.getItem("token");
 
-      console.log("🔍 Cargando detalles de la orden ID:", orderId);
-
-      // Verifica que la URL sea correcta
-      const url = `http://localhost:5000/api/transactions/${orderId}`;
-      console.log("🌐 URL de la solicitud:", url);
-
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      console.log(
-        "📊 Respuesta del servidor:",
-        response.status,
-        response.statusText
+      // ✅ USAR EL SERVICIO transactionsAPI EN LUGAR DE fetch DIRECTAMENTE
+      const response = await fetch(
+        `http://localhost:5000/api/transactions/${orderId}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
 
+      console.log("📊 Status de respuesta:", response.status);
+
       if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message ||
+            `Error ${response.status}: ${response.statusText}`
+        );
       }
 
       const data = await response.json();
-      console.log("✅ Datos de la orden recibidos:", data);
+      console.log("✅ Datos recibidos:", data);
 
-      setOrder(data.transaction);
+      // ✅ VERIFICAR DIFERENTES ESTRUCTURAS POSIBLES
+      if (data.transaction) {
+        setOrder(data.transaction);
+      } else if (data.data) {
+        setOrder(data.data);
+      } else if (data.id) {
+        setOrder(data);
+      } else {
+        throw new Error("Estructura de respuesta no reconocida");
+      }
     } catch (error) {
       console.error("❌ Error cargando orden:", error);
       setError("No se pudo cargar la orden: " + error.message);

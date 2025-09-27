@@ -22,12 +22,15 @@ import OrderConfirmationPage from "./pages/customer/OrderConfirmationPage";
 import OrderHistoryPage from "./pages/customer/OrderHistoryPage";
 import ExternalProductRequests from "./pages/admin/ExternalProductRequests";
 import CartPage from "./pages/customer/CartPage";
+import CartMigrationHandler from "./components/common/CartMigrationHandler";
+
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
         <CartProvider>
+          <CartMigrationHandler />
           <div className="App">
             <Header />
             <Routes>

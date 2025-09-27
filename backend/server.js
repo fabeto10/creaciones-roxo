@@ -10,6 +10,7 @@ import designRoutes from './routes/designs.js';
 import charmRoutes from './routes/charms.js';
 import adminSetup from './routes/adminSetup.js';
 import transactionRoutes from './routes/transactions.js';
+import cartRoutes from './routes/cart.js';
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use(cors({
 connectDB().catch(console.error);
 
 // Rutas
+app.use('/api/cart', cartRoutes); // ← Añade esta línea
 app.use('/api/setup', adminSetup);
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);

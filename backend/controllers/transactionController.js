@@ -1,6 +1,47 @@
 import prisma from "../config/database.js";
 import { ExchangeRateService } from "../utils/exchangeRate.js";
 
+
+async function updateProductStock(items, action) {
+  for (const item of items) {
+    try {
+      const product = await prisma.product.findUnique({
+        where: { id: item.productId },
+      });
+
+      if (product) {
+        let newStock = product.stock;
+
+        if (action === "RESERVE") {
+          newStock = Math.max(0, product.stock - item.quantity);
+        } else if (action === "RESTORE") {
+          newStock = product.stock + item.quantity;
+        } else if (action === "COMPLETE") {
+          // Stock ya fue reservado, solo marcar como vendido
+          newStock = Math.max(0, product.stock);
+        } else if (action === "CANCEL") {
+          newStock = product.stock + item.quantity;
+        }
+
+        await prisma.product.update({
+          where: { id: item.productId },
+          data: { stock: newStock },
+        });
+
+        console.log(
+          `📦 Stock updated for product ${item.productId}: ${product.stock} -> ${newStock} (${action})`
+        );
+      }
+    } catch (error) {
+      console.error(
+        `❌ Error updating stock for product ${item.productId}:`,
+        error
+      );
+    }
+  }
+}
+
+
 // Calcular precio según método de pago
 export const calculatePayment = async (req, res) => {
   try {
@@ -65,12 +106,10 @@ export const calculatePayment = async (req, res) => {
 };
 
 // Crear nueva transacción
-// Crear nueva transacción
 export const createTransaction = async (req, res) => {
   try {
     console.log("📦 Incoming transaction request");
     console.log("📋 Request body:", req.body);
-    console.log("📎 Request file:", req.file);
 
     const { items, paymentMethod, paymentDetails } = req.body;
 
@@ -99,7 +138,66 @@ export const createTransaction = async (req, res) => {
       });
     }
 
+
+    async function validateStock(items) {
+      const errors = [];
+      const availableProducts = [];
+
+      for (const item of items) {
+        try {
+          const product = await prisma.product.findUnique({
+            where: { id: item.productId },
+          });
+
+          if (!product) {
+            errors.push({
+              productId: item.productId,
+              productName: item.productName,
+              error: "Producto no encontrado",
+            });
+            continue;
+          }
+
+          if (product.stock < item.quantity) {
+            errors.push({
+              productId: item.productId,
+              productName: item.productName,
+              error: "Stock insuficiente",
+              requested: item.quantity,
+              available: product.stock,
+            });
+          } else {
+            availableProducts.push({
+              ...product,
+              requestedQuantity: item.quantity,
+            });
+          }
+        } catch (error) {
+          errors.push({
+            productId: item.productId,
+            productName: item.productName,
+            error: "Error validando stock",
+          });
+        }
+      }
+
+      return {
+        valid: errors.length === 0,
+        errors,
+        availableProducts,
+      };
+    }
     console.log("✅ Parsed items:", parsedItems);
+
+    // ✅ VALIDACIÓN CRÍTICA: Verificar stock antes de crear la transacción
+    const stockValidation = await validateStock(parsedItems);
+    if (!stockValidation.valid) {
+      return res.status(400).json({
+        message: "Stock insuficiente",
+        errors: stockValidation.errors,
+        availableProducts: stockValidation.availableProducts,
+      });
+    }
 
     // Calcular total en USD
     const totalUSD = parsedItems.reduce((total, item) => {
@@ -123,7 +221,7 @@ export const createTransaction = async (req, res) => {
       console.log(`💰 Descuento aplicado: ${discountPercentage.toFixed(1)}%`);
     }
 
-    // Preparar datos de la transacción para Prisma (SOLO CAMPOS QUE EXISTEN EN EL SCHEMA)
+    // Preparar datos de la transacción
     const transactionDataForPrisma = {
       amountUSD: finalAmountUSD,
       paymentMethod: paymentMethod,
@@ -169,6 +267,9 @@ export const createTransaction = async (req, res) => {
 
     console.log("📊 Transaction data for Prisma:", transactionDataForPrisma);
 
+    // ✅ ACTUALIZAR STOCK ANTES de crear la transacción
+    await updateProductStock(parsedItems, "RESERVE");
+
     // Crear la transacción
     const transaction = await prisma.transaction.create({
       data: transactionDataForPrisma,
@@ -213,13 +314,25 @@ export const createTransaction = async (req, res) => {
     res.status(201).json({
       message: "Transaction created successfully",
       transaction: {
+        id: transaction.id, // ← Asegurar que el ID esté en transaction.id
         ...transaction,
         orderId: order.id,
-        discountPercentage: discountPercentage > 0 ? discountPercentage : null, // Enviar en respuesta, no en BD
+        discountPercentage: discountPercentage > 0 ? discountPercentage : null,
       },
     });
   } catch (error) {
     console.error("❌ Error creating transaction:", error);
+
+    // ✅ REVERTIR STOCK en caso de error
+    try {
+      if (req.body.items) {
+        const parsedItems = JSON.parse(req.body.items);
+        await updateProductStock(parsedItems, "RESTORE");
+      }
+    } catch (revertError) {
+      console.error("❌ Error reverting stock:", revertError);
+    }
+
     res.status(500).json({
       message: "Error creating transaction",
       error: error.message,
@@ -416,10 +529,45 @@ export const updateTransactionStatus = async (req, res) => {
       return res.status(400).json({ message: "Invalid status" });
     }
 
+    // Obtener la transacción actual para saber los items
+    const currentTransaction = await prisma.transaction.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        orders: true,
+      },
+    });
+
     const updateData = { status };
     if (status === "COMPLETED") {
       updateData.verifiedAt = new Date();
+
+      // ✅ Para transacciones COMPLETED, el stock ya estaba reservado
+      if (currentTransaction.orders.length > 0) {
+        const order = currentTransaction.orders[0];
+        if (order.items) {
+          const items =
+            typeof order.items === "string"
+              ? JSON.parse(order.items)
+              : order.items;
+          await updateProductStock(items, "COMPLETE");
+        }
+      }
     }
+
+    if (status === "CANCELLED") {
+      // ✅ Para transacciones CANCELLED, restaurar el stock
+      if (currentTransaction.orders.length > 0) {
+        const order = currentTransaction.orders[0];
+        if (order.items) {
+          const items =
+            typeof order.items === "string"
+              ? JSON.parse(order.items)
+              : order.items;
+          await updateProductStock(items, "CANCEL");
+        }
+      }
+    }
+
     if (adminNotes) {
       updateData.adminNotes = adminNotes;
     }

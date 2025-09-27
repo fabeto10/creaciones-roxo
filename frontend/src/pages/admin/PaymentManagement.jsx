@@ -28,7 +28,7 @@ import {
   InputLabel,
   Tab,
   Tabs,
-  Divider // ← AGREGAR ESTO
+  Divider, // ← AGREGAR ESTO
 } from "@mui/material";
 import {
   Payment,
@@ -40,7 +40,7 @@ import {
   TrendingUp,
   AttachMoney,
   People,
-  Close // ← AGREGAR ESTO
+  Close, // ← AGREGAR ESTO
 } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
@@ -593,17 +593,255 @@ const PaymentManagement = () => {
                 </Card>
               </Grid>
 
-              {/* Información de productos (si está disponible) */}
+              {/* Información de productos - CORREGIDA (todas las imágenes ampliables) */}
               <Grid item xs={12}>
                 <Card variant="outlined" sx={{ p: 2 }}>
                   <Typography variant="h6" gutterBottom color="primary">
                     🛍️ Productos Incluidos
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  <Typography variant="body2" color="textSecondary">
-                    Información de productos disponible en el sistema de
-                    órdenes.
-                  </Typography>
+
+                  {selectedTransaction?.orders?.[0]?.items ? (
+                    <Box>
+                      {(() => {
+                        try {
+                          const items =
+                            typeof selectedTransaction.orders[0].items ===
+                            "string"
+                              ? JSON.parse(selectedTransaction.orders[0].items)
+                              : selectedTransaction.orders[0].items;
+
+                          return items.map((item, index) => {
+                            // Función para obtener la URL completa de la imagen
+                            const getImageUrl = (imgPath) => {
+                              if (!imgPath)
+                                return "/images/placeholder-bracelet.jpg";
+                              return imgPath.startsWith("http")
+                                ? imgPath
+                                : `http://localhost:5000${imgPath}`;
+                            };
+
+                            // Obtener todas las imágenes del producto
+                            const productImages =
+                              item.productImages &&
+                              item.productImages.length > 0
+                                ? item.productImages
+                                : [];
+
+                            return (
+                              <Box
+                                key={index}
+                                sx={{
+                                  mb: 3,
+                                  p: 2,
+                                  bgcolor: "grey.50",
+                                  borderRadius: 2,
+                                }}
+                              >
+                                <Grid container spacing={2} alignItems="center">
+                                  {/* Imagen principal del producto - AHORA AMPLIABLE */}
+                                  <Grid item xs={12} sm={2}>
+                                    <Box
+                                      sx={{
+                                        position: "relative",
+                                        cursor: "pointer",
+                                        "&:hover": { transform: "scale(1.05)" },
+                                        transition: "transform 0.2s",
+                                      }}
+                                      onClick={() => {
+                                        if (productImages.length > 0) {
+                                          window.open(
+                                            getImageUrl(productImages[0]),
+                                            "_blank"
+                                          );
+                                        }
+                                      }}
+                                      title="Haz clic para ampliar la imagen"
+                                    >
+                                      <img
+                                        src={
+                                          productImages.length > 0
+                                            ? getImageUrl(productImages[0])
+                                            : "/images/placeholder-bracelet.jpg"
+                                        }
+                                        alt={item.productName}
+                                        style={{
+                                          width: "100%",
+                                          height: 80,
+                                          objectFit: "cover",
+                                          borderRadius: 8,
+                                        }}
+                                        onError={(e) => {
+                                          e.target.src =
+                                            "/images/placeholder-bracelet.jpg";
+                                        }}
+                                      />
+                                      {/* Indicador de que es ampliable */}
+                                      <Box
+                                        sx={{
+                                          position: "absolute",
+                                          top: 4,
+                                          right: 4,
+                                          bgcolor: "rgba(0,0,0,0.5)",
+                                          color: "white",
+                                          borderRadius: "50%",
+                                          width: 20,
+                                          height: 20,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          fontSize: "12px",
+                                        }}
+                                      >
+                                        🔍
+                                      </Box>
+                                    </Box>
+                                  </Grid>
+
+                                  {/* Información del producto */}
+                                  <Grid item xs={12} sm={6}>
+                                    <Typography
+                                      variant="subtitle1"
+                                      fontWeight="bold"
+                                    >
+                                      {item.productName}
+                                    </Typography>
+                                    <Typography
+                                      variant="body2"
+                                      color="textSecondary"
+                                    >
+                                      {item.productDescription}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      <strong>Tipo:</strong> {item.productType}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      <strong>Precio unitario:</strong> $
+                                      {item.price}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      <strong>Cantidad:</strong> {item.quantity}
+                                    </Typography>
+                                  </Grid>
+
+                                  {/* Total */}
+                                  <Grid item xs={12} sm={4}>
+                                    <Typography
+                                      variant="h6"
+                                      color="primary"
+                                      textAlign="right"
+                                    >
+                                      Total: $
+                                      {(item.price * item.quantity).toFixed(2)}
+                                    </Typography>
+                                  </Grid>
+                                </Grid>
+
+                                {/* Galería de imágenes adicionales */}
+                                {productImages.length > 1 && (
+                                  <Box sx={{ mt: 2 }}>
+                                    <Typography
+                                      variant="body2"
+                                      color="textSecondary"
+                                      gutterBottom
+                                    >
+                                      Más imágenes del producto (
+                                      {productImages.length - 1}):
+                                    </Typography>
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        gap: 1,
+                                        flexWrap: "wrap",
+                                      }}
+                                    >
+                                      {productImages
+                                        .slice(1)
+                                        .map((img, imgIndex) => (
+                                          <Box
+                                            key={imgIndex}
+                                            sx={{
+                                              position: "relative",
+                                              cursor: "pointer",
+                                              "&:hover": {
+                                                transform: "scale(1.05)",
+                                              },
+                                              transition: "transform 0.2s",
+                                            }}
+                                            onClick={() =>
+                                              window.open(
+                                                getImageUrl(img),
+                                                "_blank"
+                                              )
+                                            }
+                                            title="Haz clic para ampliar"
+                                          >
+                                            <img
+                                              src={getImageUrl(img)}
+                                              alt={`${item.productName} ${
+                                                imgIndex + 2
+                                              }`}
+                                              style={{
+                                                width: 60,
+                                                height: 60,
+                                                objectFit: "cover",
+                                                borderRadius: 4,
+                                                border: "2px solid #e0e0e0",
+                                              }}
+                                              onError={(e) => {
+                                                e.target.src =
+                                                  "/images/placeholder-bracelet.jpg";
+                                              }}
+                                            />
+                                            <Chip
+                                              label={`${imgIndex + 2}`}
+                                              size="small"
+                                              sx={{
+                                                position: "absolute",
+                                                top: -8,
+                                                right: -8,
+                                                bgcolor: "primary.main",
+                                                color: "white",
+                                                fontSize: "0.7rem",
+                                                height: 20,
+                                                minWidth: 20,
+                                              }}
+                                            />
+                                          </Box>
+                                        ))}
+                                    </Box>
+                                  </Box>
+                                )}
+
+                                {/* Mensaje informativo */}
+                                <Typography
+                                  variant="caption"
+                                  color="textSecondary"
+                                  sx={{ mt: 1, display: "block" }}
+                                >
+                                  💡 Haz clic en cualquier imagen para verla en
+                                  tamaño completo
+                                </Typography>
+                              </Box>
+                            );
+                          });
+                        } catch (error) {
+                          console.error("Error parsing items:", error);
+                          return (
+                            <Typography color="error">
+                              Error cargando información de productos:{" "}
+                              {error.message}
+                            </Typography>
+                          );
+                        }
+                      })()}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      No hay información de productos disponible para esta
+                      transacción
+                    </Typography>
+                  )}
                 </Card>
               </Grid>
             </Grid>

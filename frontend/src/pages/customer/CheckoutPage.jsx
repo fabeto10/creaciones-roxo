@@ -46,6 +46,7 @@ const CheckoutPage = () => {
     clearCart,
     calculateCartPriceInfo,
     calculateDiscountPercentage,
+    syncCartWithServerStock,
   } = useCart();
 
   const cartPriceInfo = calculateCartPriceInfo();
@@ -63,10 +64,13 @@ const CheckoutPage = () => {
   const [exchangeInfo, setExchangeInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [calculatingExchange, setCalculatingExchange] = useState(false);
+  const [submittingOrder, setSubmittingOrder] = useState(false);
 
   const steps = ["Revisar Carrito", "Método de Pago", "Confirmar Pedido"];
 
   useEffect(() => {
+    // Validación de autenticación
     if (!isAuthenticated) {
       navigate("/login", {
         state: {
@@ -77,34 +81,52 @@ const CheckoutPage = () => {
       return;
     }
 
+    // Validación de carrito vacío
     if (cartItems.length === 0) {
       navigate("/tienda");
       return;
     }
+  }, [isAuthenticated, cartItems.length, navigate]);
 
-    // ✅ VALIDAR STOCK AL CARGAR LA PÁGINA
-    const stockErrors = cartItems.filter(
-      (item) => item.product.stock < item.quantity
-    );
-    if (stockErrors.length > 0) {
-      const errorMessage = `Algunos productos no tienen suficiente stock:\n${stockErrors
-        .map(
-          (error) =>
-            `- ${error.product.name}: Solicitados ${error.quantity}, Disponibles ${error.product.stock}`
-        )
-        .join("\n")}`;
-
-      alert(errorMessage);
-      navigate("/cart");
+  // Efecto separado para método de pago
+  useEffect(() => {
+    if (paymentMethod) {
+      calculateExchange();
     }
-  }, [isAuthenticated, cartItems, navigate]);
+  }, [paymentMethod]);
+
+  // Efecto separado para validación de stock
+  useEffect(() => {
+    const validateStock = async () => {
+      try {
+        await syncCartWithServerStock?.();
+
+        const stockErrors = cartItems.filter(
+          (item) =>
+            item.product.stock < item.quantity || item.product.stock <= 0
+        );
+
+        if (stockErrors.length > 0) {
+          console.log("❌ Errores de stock encontrados, redirigiendo...");
+          // La redirección se manejará automáticamente por el primer efecto
+        }
+      } catch (error) {
+        console.error("Error validando stock:", error);
+      }
+    };
+
+    if (cartItems.length > 0 && isAuthenticated) {
+      validateStock();
+    }
+  }, [cartItems, isAuthenticated]); // Dependencias específicas
 
   // Calcular información de cambio
   const calculateExchange = async () => {
     if (!paymentMethod) return;
 
-    setLoading(true);
+    setCalculatingExchange(true);
     try {
+      const currentTotal = getCartTotalUSD();
       const response = await fetch(
         "http://localhost:5000/api/transactions/payments/calculate",
         {
@@ -113,7 +135,7 @@ const CheckoutPage = () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            amountUSD: getCartTotalUSD(),
+            amountUSD: currentTotal, // ← Usar la constante local
             method: paymentMethod,
           }),
         }
@@ -130,15 +152,9 @@ const CheckoutPage = () => {
       console.error("❌ Error calculating exchange:", error);
       setError("Error al calcular la tasa de cambio: " + error.message);
     } finally {
-      setLoading(false);
+      setCalculatingExchange(false);
     }
   };
-
-  useEffect(() => {
-    if (paymentMethod) {
-      calculateExchange();
-    }
-  }, [paymentMethod, getCartTotalUSD()]);
 
   const handlePaymentMethodChange = (event) => {
     const method = event.target.value;
@@ -190,7 +206,7 @@ const CheckoutPage = () => {
       return;
     }
 
-    setLoading(true);
+    setSubmittingOrder(true);
     setError("");
 
     try {
@@ -240,6 +256,11 @@ const CheckoutPage = () => {
         body: formData,
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Error del servidor:", response.status, errorText);
+        throw new Error(`Error del servidor: ${response.status}`);
+      }
       // ✅ VERIFICACIÓN MÁS ROBUSTA DE LA RESPUESTA
       const result = await response.json();
       console.log(
@@ -247,41 +268,34 @@ const CheckoutPage = () => {
         JSON.stringify(result, null, 2)
       );
 
-      if (!response.ok) {
-        console.error("❌ Error del servidor:", response.status, result);
+      // ✅ VERIFICAR ESTRUCTURAS POSIBLES
+      let transactionId;
+
+      if (result.transaction && result.transaction.id) {
+        transactionId = result.transaction.id;
+      } else if (result.id) {
+        transactionId = result.id;
+      } else if (result.data && result.data.id) {
+        transactionId = result.data.id;
+      } else {
         throw new Error(
-          result.message || `Error del servidor: ${response.status}`
+          "No se pudo encontrar el ID de la transacción en la respuesta"
         );
       }
 
-      // ✅ VERIFICAR ESTRUCTURA DE LA RESPUESTA
-      if (!result || !result.transaction) {
-        console.error("❌ Respuesta inesperada:", result);
-        throw new Error("La respuesta del servidor no es válida");
-      }
-
-      // ✅ OBTENER EL ID CORRECTAMENTE
-      const transactionId = result.transaction.id;
-
-      if (!transactionId) {
-        throw new Error("No se pudo obtener el ID de la transacción");
-      }
-
       console.log("✅ ID de transacción encontrado:", transactionId);
-      console.log("🎯 Redirigiendo a orden:", transactionId);
 
-      // ✅ LIMPIAR CARRITO Y REDIRIGIR
+      // ✅ LIMPIAR CARRITO
       clearCart();
 
-      // ✅ AGREGAR TIMEOUT PARA ASEGURAR LA NAVEGACIÓN
-      setTimeout(() => {
-        navigate(`/order-confirmation/${transactionId}`);
-      }, 100);
+      // ✅ REDIRIGIR INMEDIATAMENTE - Sin setTimeout
+      console.log("🎯 Redirigiendo a:", `/order-confirmation/${transactionId}`);
+      navigate(`/order-confirmation/${transactionId}`);
     } catch (error) {
       console.error("❌ Error submitting order:", error);
       setError(error.message || "Error al procesar la orden");
     } finally {
-      setLoading(false);
+      setSubmittingOrder(false);
     }
   };
 
@@ -764,10 +778,10 @@ const CheckoutPage = () => {
                   variant="contained"
                   fullWidth
                   onClick={() => setActiveStep(2)}
-                  disabled={!paymentMethod || loading}
+                  disabled={!paymentMethod || calculatingExchange} // ← Usar calculatingExchange
                   startIcon={<NavigateNext />}
                 >
-                  Continuar
+                  {calculatingExchange ? "Calculando..." : "Continuar"}
                 </Button>
               </Box>
             </Paper>
@@ -863,11 +877,11 @@ const CheckoutPage = () => {
                 fullWidth
                 size="large"
                 onClick={handleSubmitOrder}
-                disabled={loading}
+                disabled={submittingOrder} // ← Usar submittingOrder
                 startIcon={<Check />}
                 sx={{ mb: 2 }}
               >
-                {loading ? "Procesando..." : "Confirmar y Pagar"}
+                {submittingOrder ? "Procesando..." : "Confirmar y Pagar"}
               </Button>
 
               <Button

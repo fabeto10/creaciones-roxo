@@ -21,7 +21,6 @@ import {
   PriceCheck,
 } from "@mui/icons-material";
 import BraceletCustomizer from "./BraceletCustomizer";
-import ImageWithFallback from "../common/ImageWithFallback";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -31,7 +30,8 @@ const ProductCard = ({ product }) => {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [images, setImages] = useState([]);
-  const { addToCart, calculatePriceInfo, canAddToCart } = useCart();
+  const { addToCart, calculatePriceInfo, canAddToCart, removeProductFromCart } =
+    useCart();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -90,7 +90,20 @@ const ProductCard = ({ product }) => {
 
     setImages(getProductImages());
     setCurrentImageIndex(0); // Resetear índice cuando cambia el producto
-  }, [product]);
+  }, [isOutOfStock, product.id, product.images]);
+
+  useEffect(() => {
+    if (isOutOfStock) {
+      removeProductFromCart(product.id, {});
+    }
+  }, [isOutOfStock, product.id, removeProductFromCart]);
+
+  const checkAvailability = () => {
+    const validation = canAddToCart(product, {});
+    return validation.canAdd;
+  };
+
+  const isAvailable = checkAvailability();
 
   const handleAddToCart = () => {
     if (!isAuthenticated) {
@@ -103,23 +116,22 @@ const ProductCard = ({ product }) => {
       return;
     }
 
-    if (canAddToCart) {
-      const validation = canAddToCart(product);
+    // ✅ Verificación directa sin duplicados
+    const validation = canAddToCart(product, {});
 
-      if (!validation.canAdd) {
-        switch (validation.reason) {
-          case "AGOTADO":
-            alert("❌ Este producto está agotado");
-            break;
-          case "STOCK_INSUFICIENTE":
-            alert(
-              `⚠️ No hay suficiente stock. Solo quedan ${validation.available} unidades.`
-            );
-            break;
-          default:
-            alert("❌ No se puede agregar este producto al carrito");
-        }
-        return;
+    if (!validation.canAdd) {
+      switch (validation.reason) {
+        case "AGOTADO":
+          alert("❌ Este producto está agotado");
+          return;
+        case "STOCK_INSUFICIENTE":
+          alert(
+            `⚠️ No hay suficiente stock. Solo quedan ${validation.available} unidades.`
+          );
+          return;
+        default:
+          alert("❌ No se puede agregar este producto al carrito");
+          return;
       }
     }
 
@@ -164,17 +176,17 @@ const ProductCard = ({ product }) => {
           flexDirection: "column",
           transition: "transform 0.3s ease, box-shadow 0.3s ease",
           "&:hover": {
-            transform: isOutOfStock ? "none" : "translateY(-4px)",
-            boxShadow: isOutOfStock
-              ? "none"
-              : "0 8px 32px rgba(233, 30, 99, 0.15)",
+            transform: isAvailable ? "translateY(-4px)" : "none",
+            boxShadow: isAvailable
+              ? "0 8px 32px rgba(233, 30, 99, 0.15)"
+              : "none",
           },
-          opacity: isOutOfStock ? 0.7 : 1,
+          opacity: isAvailable ? 1 : 0.7,
           position: "relative",
         }}
       >
         {/* Badge de AGOTADO */}
-        {isOutOfStock && (
+        {!isAvailable && (
           <Box
             sx={{
               position: "absolute",
@@ -359,23 +371,23 @@ const ProductCard = ({ product }) => {
               startIcon={product.customizable ? <Build /> : <ShoppingCart />}
               onClick={handleAddToCart}
               size="medium"
-              disabled={isOutOfStock} // Solo deshabilitar si está agotado
+              disabled={!isAvailable}
               sx={{
-                background: isOutOfStock
-                  ? "grey.400"
-                  : "linear-gradient(135deg, #e91e63 0%, #9c27b0 100%)",
-                "&:hover": isOutOfStock
-                  ? {}
-                  : {
+                background: isAvailable
+                  ? "linear-gradient(135deg, #e91e63 0%, #9c27b0 100%)"
+                  : "grey.400",
+                "&:hover": isAvailable
+                  ? {
                       background:
                         "linear-gradient(135deg, #c2185b 0%, #7b1fa2 100%)",
-                    },
+                    }
+                  : {},
                 mt: 1,
-                cursor: isOutOfStock ? "not-allowed" : "pointer",
+                cursor: isAvailable ? "pointer" : "not-allowed",
               }}
             >
-              {isOutOfStock
-                ? "PRODUCTO AGOTADO"
+              {!isAvailable
+                ? "AGOTADO"
                 : product.customizable
                 ? "Personalizar"
                 : "Agregar al Carrito"}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Container,
   Grid,
@@ -29,31 +29,29 @@ const StorePage = () => {
   const [sortBy, setSortBy] = useState("name");
   const [currentPage, setCurrentPage] = useState(1);
   const [filterOpen, setFilterOpen] = useState(false);
-  const { syncCartWithStock } = useCart();
-  const productsPerPage = 9;
+  const { syncCartWithStock } = useCart(); // Solo esta función
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
+  const productsPerPage = 9;
 
   // En StorePage.jsx, modifica el filtro:
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       setLoading(true);
       const response = await productsAPI.getProducts();
-      // MOSTRAR TODOS los productos activos, incluso agotados
       const activeProducts = response.data.filter((p) => p.isActive);
-      if (syncCartWithStock) {
-        syncCartWithStock(activeProducts);
-      }
+      syncCartWithStock(activeProducts);
       setProducts(activeProducts);
     } catch (error) {
       console.error("Error loading products:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [syncCartWithStock]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   const categories = useMemo(
     () => [

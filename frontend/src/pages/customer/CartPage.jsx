@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react"; // ← AGREGAR useEffect
 import {
   Container,
   Paper,
@@ -34,15 +34,52 @@ const CartPage = () => {
     removeFromCart,
     calculateCartPriceInfo,
     clearCart,
+    syncCartWithServerStock, // ← AGREGAR esta función
   } = useCart();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const cartPriceInfo = calculateCartPriceInfo();
 
+  // ✅ EFECTO PARA SINCRONIZAR Y ELIMINAR PRODUCTOS AGOTADOS
+  useEffect(() => {
+    // Sincronizar con el servidor al cargar la página
+    if (syncCartWithServerStock) {
+      syncCartWithServerStock();
+    }
+
+    // Eliminar productos agotados automáticamente
+    const outOfStockItems = cartItems.filter((item) => item.product.stock <= 0);
+    if (outOfStockItems.length > 0) {
+      outOfStockItems.forEach((item) => {
+        removeFromCart(item.id);
+      });
+      
+      if (outOfStockItems.length > 0) {
+        alert(
+          `Se removieron ${outOfStockItems.length} productos agotados del carrito`
+        );
+      }
+    }
+  }, [cartItems, removeFromCart, syncCartWithServerStock]);
+
   const handleQuantityChange = (itemId, newQuantity) => {
     if (newQuantity < 1) return;
     updateQuantity(itemId, newQuantity);
+  };
+
+  // ✅ FUNCIÓN CORREGIDA: Obtener estado del item
+  const getItemStatus = (item) => {
+    if (item.product.stock <= 0) {
+      return { status: "out-of-stock", message: "AGOTADO - Será removido automáticamente" };
+    }
+    if (item.quantity > item.product.stock) {
+      return {
+        status: "insufficient",
+        message: `Stock insuficiente - Máximo disponible: ${item.product.stock}`,
+      };
+    }
+    return { status: "available", message: "Disponible" };
   };
 
   const handleCheckout = () => {
@@ -71,21 +108,7 @@ const CartPage = () => {
     navigate("/checkout");
   };
 
-  const getStockStatus = (item) => {
-    if (item.product.stock <= 0) {
-      return { status: "out-of-stock", message: "AGOTADO" };
-    }
-    if (item.quantity > item.product.stock) {
-      return {
-        status: "insufficient",
-        message: `Stock: ${item.product.stock} disponibles`,
-      };
-    }
-    return {
-      status: "available",
-      message: `Stock: ${item.product.stock} disponibles`,
-    };
-  };
+  // ✅ FUNCIÓN ELIMINADA: getStockStatus es redundante, usar getItemStatus
 
   const canProceedToCheckout = cartItems.every(
     (item) => item.product.stock >= item.quantity && item.product.stock > 0
@@ -143,7 +166,7 @@ const CartPage = () => {
           {/* Lista de productos */}
           <Grid item xs={12} lg={8}>
             {cartItems.map((item) => {
-              const stockStatus = getStockStatus(item);
+              const itemStatus = getItemStatus(item); // ← CORREGIDO: usar itemStatus
 
               return (
                 <Card
@@ -152,20 +175,24 @@ const CartPage = () => {
                     mb: 2,
                     borderRadius: 2,
                     border:
-                      stockStatus.status !== "available"
+                      itemStatus.status !== "available"
                         ? "2px solid #ff4444"
                         : "none",
                   }}
                 >
+                  {/* ✅ MOSTRAR ALERTA SOLO SI HAY PROBLEMAS */}
+                  {itemStatus.status !== "available" && (
+                    <Alert 
+                      severity={
+                        itemStatus.status === "out-of-stock" ? "error" : "warning"
+                      } 
+                      sx={{ mb: 2 }}
+                    >
+                      {itemStatus.message}
+                    </Alert>
+                  )}
+                  
                   <CardContent>
-                    {/* Indicador de stock */}
-                    {stockStatus.status !== "available" && (
-                      <Alert severity="error" sx={{ mb: 2 }}>
-                        {stockStatus.status === "out-of-stock"
-                          ? "❌ Este producto está agotado"
-                          : `⚠️ Stock insuficiente: ${item.product.stock} disponibles`}
-                      </Alert>
-                    )}
                     <Grid container spacing={2} alignItems="center">
                       {/* Imagen del producto */}
                       <Grid item xs={12} sm={3}>
@@ -190,6 +217,29 @@ const CartPage = () => {
                                 position: "absolute",
                                 top: 8,
                                 left: 8,
+                              }}
+                            />
+                          )}
+                          
+                          {/* ✅ CHIP DE ESTADO EN LA IMAGEN */}
+                          {itemStatus.status !== "available" && (
+                            <Chip
+                              label={
+                                itemStatus.status === "out-of-stock" 
+                                  ? "AGOTADO" 
+                                  : "STOCK INSUFICIENTE"
+                              }
+                              size="small"
+                              color={
+                                itemStatus.status === "out-of-stock" 
+                                  ? "error" 
+                                  : "warning"
+                              }
+                              sx={{
+                                position: "absolute",
+                                bottom: 8,
+                                left: 8,
+                                fontSize: "0.6rem",
                               }}
                             />
                           )}
@@ -228,6 +278,24 @@ const CartPage = () => {
                         <Typography variant="body2" color="textSecondary">
                           {item.priceInfo?.priceBS?.toFixed(2) || "0.00"} BS c/u
                         </Typography>
+                        
+                        {/* ✅ INFO DE STOCK ACTUALIZADA */}
+                        <Typography 
+                          variant="caption" 
+                          color={
+                            itemStatus.status === "out-of-stock" 
+                              ? "error" 
+                              : itemStatus.status === "insufficient" 
+                                ? "warning" 
+                                : "success"
+                          }
+                          sx={{ display: "block", mt: 0.5 }}
+                        >
+                          📦 Stock actual: {item.product.stock} unidades
+                          {itemStatus.status === "insufficient" && 
+                            ` (Solicitadas: ${item.quantity})`
+                          }
+                        </Typography>
                       </Grid>
 
                       {/* Controles de cantidad y precio */}
@@ -244,12 +312,17 @@ const CartPage = () => {
                               onClick={() =>
                                 handleQuantityChange(item.id, item.quantity - 1)
                               }
-                              disabled={item.quantity <= 1}
+                              disabled={item.quantity <= 1 || itemStatus.status === "out-of-stock"}
                             >
                               <Remove />
                             </IconButton>
                             <Typography
-                              sx={{ mx: 2, minWidth: 30, textAlign: "center" }}
+                              sx={{ 
+                                mx: 2, 
+                                minWidth: 30, 
+                                textAlign: "center",
+                                color: itemStatus.status !== "available" ? "text.disabled" : "text.primary"
+                              }}
                             >
                               {item.quantity}
                             </Typography>
@@ -258,6 +331,7 @@ const CartPage = () => {
                               onClick={() =>
                                 handleQuantityChange(item.id, item.quantity + 1)
                               }
+                              disabled={itemStatus.status !== "available"}
                             >
                               <Add />
                             </IconButton>
@@ -272,14 +346,25 @@ const CartPage = () => {
                         </Box>
 
                         <Box textAlign="right">
-                          <Typography variant="h6" color="primary">
+                          <Typography 
+                            variant="h6" 
+                            color={
+                              itemStatus.status !== "available" 
+                                ? "text.disabled" 
+                                : "primary"
+                            }
+                          >
                             ${(item.price * item.quantity).toFixed(2)} USD
                           </Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            {(item.priceInfo.priceBS * item.quantity).toFixed(
-                              2
-                            )}{" "}
-                            BS
+                          <Typography 
+                            variant="body2" 
+                            color={
+                              itemStatus.status !== "available" 
+                                ? "text.disabled" 
+                                : "textSecondary"
+                            }
+                          >
+                            {(item.priceInfo?.priceBS * item.quantity).toFixed(2) || "0.00"} BS
                           </Typography>
                         </Box>
                       </Grid>
@@ -297,6 +382,13 @@ const CartPage = () => {
                 Resumen del Pedido
               </Typography>
               <Divider sx={{ my: 2 }} />
+
+              {/* ✅ ALERTA DE ESTADO DEL CARRITO */}
+              {!canProceedToCheckout && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  Algunos productos tienen problemas de stock. Revisa tu carrito antes de proceder al pago.
+                </Alert>
+              )}
 
               <Box sx={{ mb: 2 }}>
                 <Box display="flex" justifyContent="space-between" mb={1}>
@@ -374,7 +466,7 @@ const CartPage = () => {
                 fullWidth
                 size="large"
                 onClick={handleCheckout}
-                disabled={!canProceedToCheckout} // ← DESHABILITAR SI HAY PROBLEMAS DE STOCK
+                disabled={!canProceedToCheckout || cartItems.length === 0}
                 sx={{ mb: 1 }}
               >
                 {canProceedToCheckout
@@ -382,14 +474,30 @@ const CartPage = () => {
                   : "Revisar Stock del Carrito"}
               </Button>
 
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={clearCart}
-                color="error"
-              >
-                Vaciar Carrito
-              </Button>
+              <Box display="flex" gap={1}>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  onClick={() => navigate("/tienda")}
+                >
+                  Seguir Comprando
+                </Button>
+                
+                <Button
+                  variant="outlined"
+                  onClick={clearCart}
+                  color="error"
+                >
+                  Vaciar
+                </Button>
+              </Box>
+
+              {/* ✅ INFORMACIÓN ADICIONAL */}
+              <Box sx={{ mt: 2, p: 1, bgcolor: "grey.50", borderRadius: 1 }}>
+                <Typography variant="caption" color="textSecondary">
+                  💡 <strong>Nota:</strong> Los productos agotados se eliminan automáticamente del carrito.
+                </Typography>
+              </Box>
             </Paper>
           </Grid>
         </Grid>
